@@ -243,10 +243,16 @@ export function App() {
       }}
     >
       <aside className="sidebar">
-        <div className="brand">Proof Studio</div>
+        <div className="drag" />
+        <div className="brand">
+          <span className="logo">∎</span>
+          Proof Studio
+        </div>
         <button className="new-problem" type="button" onClick={() => void openFolder()}>
+          <Icon name="plus" />
           Open folder
         </button>
+        <div className="section-label">Problems</div>
         <div className="problems">
           {problems.length === 0 && <p className="hint">Open a folder to start a problem.</p>}
           {problems.map((problem) => (
@@ -260,7 +266,8 @@ export function App() {
                     setSelectedFile('source')
                   }}
                 >
-                  {problem.title}
+                  <Icon name="folder" />
+                  <span>{problem.title}</span>
                 </button>
                 <button
                   className="delete-problem"
@@ -268,7 +275,7 @@ export function App() {
                   aria-label={`Delete ${problem.title}`}
                   onClick={() => setPendingDelete(problem)}
                 >
-                  ×
+                  <Icon name="trash" size={14} />
                 </button>
               </div>
               {problem.id === selectedId && pair && (
@@ -281,6 +288,7 @@ export function App() {
                       aria-current={item.key === selectedFile}
                       onClick={() => setSelectedFile(item.key)}
                     >
+                      <span className="file-dot" data-state={item.state} />
                       <span className="file-name">{item.filename}</span>
                       <span className="file-state" data-state={item.state}>
                         {STATE_LABEL[item.state]}
@@ -300,17 +308,24 @@ export function App() {
             setKeyOpen(true)
           }}
         >
+          <Icon name="key" />
           {keySet ? 'API key set' : 'API key'}
+          <span className="key-status" data-set={keySet} />
         </button>
       </aside>
       <main className="main">
         <header className="topbar">
           <div>
-            <div className="eyebrow">{selected?.title ?? 'No problem selected'}</div>
+            <div className="eyebrow">
+              {selected && <Icon name="folder" size={13} />}
+              {selected?.title ?? 'No problem selected'}
+            </div>
             <h1>{pair?.title ?? 'Proof Studio'}</h1>
             {pair && (
               <div className="filename">
-                {fileName(selected, pair.left)} → {fileName(selected, pair.right)}
+                <span className="chip">{fileName(selected, pair.left)}</span>
+                <Icon name="arrow" size={13} />
+                <span className="chip">{fileName(selected, pair.right)}</span>
               </div>
             )}
           </div>
@@ -322,17 +337,20 @@ export function App() {
               title={pair?.action === 'unavailable' ? 'Not available in this version.' : undefined}
               onClick={() => void runAction()}
             >
+              <Icon name={actionIcon(pair, selected)} size={15} />
               {action.label}
             </button>
           )}
           {!selected && (
             <button className="next" type="button" onClick={() => void openFolder()}>
+              <Icon name="plus" size={15} />
               Open folder
             </button>
           )}
         </header>
         {error && (
           <p className="banner" role="alert">
+            <Icon name="alert" size={15} />
             {error}
           </p>
         )}
@@ -354,7 +372,12 @@ export function App() {
             />
           </div>
         ) : (
-          <div className="empty">Open a folder. Its name is the problem name.</div>
+          <div className="empty">
+            <span className="empty-icon">
+              <Icon name="folder" size={18} />
+            </span>
+            <p>Open a folder. Its name is the problem name.</p>
+          </div>
         )}
       </main>
       <input
@@ -443,6 +466,7 @@ function Pane({
   return (
     <section className="pane">
       <header className="pane-bar">
+        <Icon name={file.key === 'source' ? 'image' : 'file'} size={14} />
         <span className="file-name">{file.filename}</span>
         <span className="file-state" data-state={file.state}>
           {STATE_LABEL[file.state]}
@@ -462,7 +486,13 @@ function Pane({
         )}
         {content?.kind === 'text' && !editable && <pre className="editor readonly">{content.text}</pre>}
         {content?.kind === 'empty' && (
-          <div className="empty" onClick={() => file.key === 'source' && onAddScreenshot()}>
+          <div
+            className={file.key === 'source' ? 'empty droppable' : 'empty'}
+            onClick={() => file.key === 'source' && onAddScreenshot()}
+          >
+            <span className="empty-icon">
+              <Icon name={file.key === 'source' ? 'upload' : 'file'} size={18} />
+            </span>
             <p>{emptyCopy(file.key)}</p>
             {content.error && <p className="empty-error">{content.error}</p>}
           </div>
@@ -470,6 +500,43 @@ function Pane({
       </div>
     </section>
   )
+}
+
+const ICONS = {
+  plus: 'M8 3.5v9M3.5 8h9',
+  folder: 'M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z',
+  trash: 'M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5',
+  key: 'M7 6a3 3 0 1 0 6 0a3 3 0 1 0-6 0M7.9 8.1 3 13M4.5 11.5 6 13',
+  sparkle: 'M7 2.5l1.2 3.3 3.3 1.2-3.3 1.2L7 11.5 5.8 8.2 2.5 7l3.3-1.2zM12.5 10.5v3M11 12h3',
+  file: 'M4 2.5h5l3 3v8H4zM9 2.5v3h3',
+  image: 'M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 13.5 4v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 12zM2.5 11l3-3 3 3 2-2 3 3M10.5 5.75v.01',
+  upload: 'M8 10.5V3M5 6l3-3 3 3M3 10.5V12a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 13 12v-1.5',
+  arrow: 'M3 8h10M9 4l4 4-4 4',
+  alert: 'M8 2.5 14 13H2zM8 6.5v3M8 11.5v.01'
+} as const
+
+function Icon({ name, size = 16 }: { name: keyof typeof ICONS; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={ICONS[name]} />
+    </svg>
+  )
+}
+
+function actionIcon(pair: FilePair | null, problem: ProblemSummary | null): keyof typeof ICONS {
+  if (pair?.action !== 'generate-tex' || !problem) return 'sparkle'
+  const source = fileByKey(problem.files, 'source')
+  return !source || source.state === 'empty' || source.state === 'failed' ? 'upload' : 'sparkle'
 }
 
 function pairFor(key: FileKey, files: ProblemFileView[]): FilePair {

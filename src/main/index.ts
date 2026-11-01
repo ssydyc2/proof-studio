@@ -14,7 +14,9 @@ function createWindow(): void {
     minWidth: 980,
     minHeight: 620,
     title: 'Proof Studio',
-    backgroundColor: '#f0f2f5',
+    backgroundColor: '#f4f6fa',
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 18, y: 18 },
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
