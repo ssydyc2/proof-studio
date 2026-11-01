@@ -1,0 +1,600 @@
+import { useEffect, useRef, useState } from 'react'
+import {
+  fileByKey,
+  pdfKeyFor,
+  type FileContent,
+  type FileKey,
+  type ProblemFileView,
+  type ProblemSummary,
+  type TexSourceKey
+} from '../../shared/problem'
+
+const ACCEPTED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+const STATE_LABEL = {
+  empty: 'Empty',
+  current: 'Current',
+  stale: 'Stale',
+  failed: 'Failed'
+} as const
+
+type PairAction = 'generate-tex' | 'generate-pdf' | 'unavailable'
+
+type FilePair = {
+  left: FileKey
+  right: FileKey
+  title: string
+  action: PairAction
+  label: string
+  busyLabel: string
+  texKey?: TexSourceKey
+}
+
+export function App() {
+  const [problems, setProblems] = useState<ProblemSummary[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<FileKey>('source')
+  const [leftContent, setLeftContent] = useState<FileContent | null>(null)
+  const [rightContent, setRightContent] = useState<FileContent | null>(null)
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState<'transcribe' | 'pdf' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<ProblemSummary | null>(null)
+  const [keyOpen, setKeyOpen] = useState(false)
+  const [keyDraft, setKeyDraft] = useState('')
+  const [keySet, setKeySet] = useState(false)
+  const [loadTick, setLoadTick] = useState(0)
+  const loaded = useRef('')
+  const fileInput = useRef<HTMLInputElement>(null)
+  const pendingAfterKey = useRef(false)
+
+  const selected = problems.find((problem) => problem.id === selectedId) ?? null
+  const pair = selected ? pairFor(selectedFile, selected.files) : null
+  const showsTex = pair?.left === 'problemText' || pair?.right === 'problemText'
+
+  useEffect(() => {
+    if (!window.proofStudio) return
+    void window.proofStudio.listProblems().then((nextProblems) => {
+      setProblems(nextProblems)
+      if (nextProblems[0]) setSelectedId(nextProblems[0].id)
+    })
+    void window.proofStudio.hasApiKey().then(setKeySet)
+  }, [])
+
+  useEffect(() => {
+    if (!selectedId || !pair) {
+      setLeftContent(null)
+      setRightContent(null)
+      return
+    }
+    let cancelled = false
+    void Promise.all([
+      window.proofStudio.readFile(selectedId, pair.left),
+      window.proofStudio.readFile(selectedId, pair.right)
+    ]).then(([left, right]) => {
+      if (cancelled) return
+      setLeftContent(left)
+      setRightContent(right)
+      const tex = pair.left === 'problemText' ? left : pair.right === 'problemText' ? right : null
+      if (tex?.kind === 'text') {
+        loaded.current = tex.text
+        setDraft(tex.text)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId, pair?.left, pair?.right, loadTick])
+
+  useEffect(() => {
+    if (!selectedId || !showsTex || draft === loaded.current) return
+    const id = selectedId
+    const text = draft
+    const timer = window.setTimeout(() => {
+      void window.proofStudio
+        .writeText(id, text)
+        .then((nextProblems) => {
+          loaded.current = text
+          setProblems(nextProblems)
+        })
+        .catch((cause: unknown) => setError(messageOf(cause)))
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [draft, selectedId, showsTex])
+
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      const file = imageFromClipboard(event.clipboardData)
+      if (!file) return
+      event.preventDefault()
+      void attachImage(file)
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  })
+
+  async function removeProblem(problem: ProblemSummary) {
+    try {
+      const nextProblems = await window.proofStudio.deleteProblem(problem.id)
+      setProblems(nextProblems)
+      setPendingDelete(null)
+      setError(null)
+      if (selectedId === problem.id) {
+        setSelectedId(nextProblems[0]?.id ?? null)
+        setSelectedFile('source')
+      }
+    } catch (cause) {
+      setPendingDelete(null)
+      setError(messageOf(cause))
+    }
+  }
+
+  async function openFolder(): Promise<string | null> {
+    const opened = await window.proofStudio.openFolder()
+    if (!opened) return null
+    setProblems(opened.problems)
+    setSelectedId(opened.id)
+    setSelectedFile('source')
+    setError(null)
+    return opened.id
+  }
+
+  async function attachImage(image: File, problemId?: string) {
+    if (!ACCEPTED.has(image.type)) {
+      setError('Use a PNG, JPEG, WebP, or GIF screenshot.')
+      return
+    }
+    if (image.size > 50_000_000) {
+      setError('This file is larger than 50 MB.')
+      return
+    }
+    setError(null)
+    const id = problemId ?? selectedId ?? (await openFolder())
+    if (!id) return
+    const base64 = await blobToBase64(image)
+    const nextProblems = await window.proofStudio.addSource(id, base64, image.type)
+    setProblems(nextProblems)
+    setSelectedId(id)
+    setSelectedFile('source')
+    setLoadTick((tick) => tick + 1)
+  }
+
+  async function transcribe(id: string) {
+    setBusy('transcribe')
+    setError(null)
+    try {
+      const nextProblems = await window.proofStudio.transcribe(id)
+      setProblems(nextProblems)
+      setSelectedFile('problemPdf')
+      setLoadTick((tick) => tick + 1)
+    } catch (cause) {
+      setError(messageOf(cause))
+      setProblems(await window.proofStudio.listProblems())
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function saveKey(event: React.FormEvent) {
+    event.preventDefault()
+    try {
+      await window.proofStudio.setApiKey(keyDraft)
+      setKeyDraft('')
+      setKeySet(true)
+      setKeyOpen(false)
+      const shouldTranscribe = pendingAfterKey.current
+      pendingAfterKey.current = false
+      if (shouldTranscribe && selected) await transcribe(selected.id)
+    } catch (cause) {
+      setError(messageOf(cause))
+    }
+  }
+
+  async function makePdf(texKey: TexSourceKey) {
+    if (!selected || busy) return
+    setBusy('pdf')
+    setError(null)
+    try {
+      if (texKey === 'problemText' && draft !== loaded.current) {
+        const saved = await window.proofStudio.writeText(selected.id, draft)
+        loaded.current = draft
+        setProblems(saved)
+      }
+      const nextProblems = await window.proofStudio.compilePdf(selected.id, texKey)
+      setProblems(nextProblems)
+      setSelectedFile(pdfKeyFor(texKey))
+      setLoadTick((tick) => tick + 1)
+    } catch (cause) {
+      setError(messageOf(cause))
+      setProblems(await window.proofStudio.listProblems())
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function runAction() {
+    if (!selected || !pair || busy) return
+    if (pair.action === 'generate-tex') {
+      const source = fileByKey(selected.files, 'source')
+      if (!source || source.state === 'empty' || source.state === 'failed') {
+        fileInput.current?.click()
+        return
+      }
+      if (!(await window.proofStudio.hasApiKey())) {
+        pendingAfterKey.current = true
+        setKeyOpen(true)
+        return
+      }
+      await transcribe(selected.id)
+      return
+    }
+    if (pair.action === 'generate-pdf' && pair.texKey) await makePdf(pair.texKey)
+  }
+
+  const action = selected && pair ? actionFor(pair, selected.files, busy) : null
+
+  return (
+    <div
+      className="app"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault()
+        const image = [...event.dataTransfer.files].find((item) => ACCEPTED.has(item.type))
+        if (image) void attachImage(image)
+      }}
+    >
+      <aside className="sidebar">
+        <div className="brand">Proof Studio</div>
+        <button className="new-problem" type="button" onClick={() => void openFolder()}>
+          Open folder
+        </button>
+        <div className="problems">
+          {problems.length === 0 && <p className="hint">Open a folder to start a problem.</p>}
+          {problems.map((problem) => (
+            <section key={problem.id} className={problem.id === selectedId ? 'problem open' : 'problem'}>
+              <div className="problem-row">
+                <button
+                  type="button"
+                  className="problem-title"
+                  onClick={() => {
+                    setSelectedId(problem.id)
+                    setSelectedFile('source')
+                  }}
+                >
+                  {problem.title}
+                </button>
+                <button
+                  className="delete-problem"
+                  type="button"
+                  aria-label={`Delete ${problem.title}`}
+                  onClick={() => setPendingDelete(problem)}
+                >
+                  ×
+                </button>
+              </div>
+              {problem.id === selectedId && pair && (
+                <div className="files">
+                  {problem.files.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={item.key === pair.left || item.key === pair.right ? 'file linked' : 'file'}
+                      aria-current={item.key === selectedFile}
+                      onClick={() => setSelectedFile(item.key)}
+                    >
+                      <span className="file-name">{item.filename}</span>
+                      <span className="file-state" data-state={item.state}>
+                        {STATE_LABEL[item.state]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
+        <button
+          className="key-button"
+          type="button"
+          onClick={() => {
+            pendingAfterKey.current = false
+            setKeyOpen(true)
+          }}
+        >
+          {keySet ? 'API key set' : 'API key'}
+        </button>
+      </aside>
+      <main className="main">
+        <header className="topbar">
+          <div>
+            <div className="eyebrow">{selected?.title ?? 'No problem selected'}</div>
+            <h1>{pair?.title ?? 'Proof Studio'}</h1>
+            {pair && (
+              <div className="filename">
+                {fileName(selected, pair.left)} → {fileName(selected, pair.right)}
+              </div>
+            )}
+          </div>
+          {action && (
+            <button
+              className="next"
+              type="button"
+              disabled={!action.enabled}
+              title={pair?.action === 'unavailable' ? 'Not available in this version.' : undefined}
+              onClick={() => void runAction()}
+            >
+              {action.label}
+            </button>
+          )}
+          {!selected && (
+            <button className="next" type="button" onClick={() => void openFolder()}>
+              Open folder
+            </button>
+          )}
+        </header>
+        {error && (
+          <p className="banner" role="alert">
+            {error}
+          </p>
+        )}
+        {selected && pair ? (
+          <div className="sheet">
+            <Pane
+              file={fileByKey(selected.files, pair.left)}
+              content={leftContent}
+              draft={draft}
+              onDraft={setDraft}
+              onAddScreenshot={() => fileInput.current?.click()}
+            />
+            <Pane
+              file={fileByKey(selected.files, pair.right)}
+              content={rightContent}
+              draft={draft}
+              onDraft={setDraft}
+              onAddScreenshot={() => fileInput.current?.click()}
+            />
+          </div>
+        ) : (
+          <div className="empty">Open a folder. Its name is the problem name.</div>
+        )}
+      </main>
+      <input
+        ref={fileInput}
+        className="hidden-input"
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        onChange={(event) => {
+          const image = event.target.files?.[0]
+          event.target.value = ''
+          if (image) void attachImage(image)
+        }}
+      />
+      {pendingDelete && (
+        <div className="modal-backdrop">
+          <form
+            className="modal"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void removeProblem(pendingDelete)
+            }}
+          >
+            <h2>Delete {pendingDelete.title}?</h2>
+            <p>Are you sure?</p>
+            <div className="modal-actions">
+              <button className="secondary" type="button" onClick={() => setPendingDelete(null)}>
+                Cancel
+              </button>
+              <button className="danger" type="submit">
+                Delete
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {keyOpen && (
+        <div className="modal-backdrop">
+          <form className="modal" onSubmit={(event) => void saveKey(event)}>
+            <h2>API key</h2>
+            <p>Enter your Meta Model API key. It stays in memory until you quit Proof Studio.</p>
+            <input
+              autoFocus
+              type="password"
+              value={keyDraft}
+              placeholder="API key"
+              onChange={(event) => setKeyDraft(event.target.value)}
+            />
+            <div className="modal-actions">
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => {
+                  pendingAfterKey.current = false
+                  setKeyOpen(false)
+                  setKeyDraft('')
+                }}
+              >
+                Cancel
+              </button>
+              <button className="next" type="submit">
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Pane({
+  file,
+  content,
+  draft,
+  onDraft,
+  onAddScreenshot
+}: {
+  file: ProblemFileView | undefined
+  content: FileContent | null
+  draft: string
+  onDraft: (value: string) => void
+  onAddScreenshot: () => void
+}) {
+  if (!file) return null
+  const editable = file.key === 'problemText' && content?.kind === 'text'
+  return (
+    <section className="pane">
+      <header className="pane-bar">
+        <span className="file-name">{file.filename}</span>
+        <span className="file-state" data-state={file.state}>
+          {STATE_LABEL[file.state]}
+        </span>
+      </header>
+      <div className="pane-body">
+        {content?.kind === 'image' && <img className="preview" src={content.dataUrl} alt="Problem screenshot" />}
+        {content?.kind === 'pdf' && <embed className="pdf" type="application/pdf" src={content.dataUrl} />}
+        {editable && (
+          <textarea
+            className="editor"
+            spellCheck={false}
+            value={draft}
+            aria-label={file.label}
+            onChange={(event) => onDraft(event.target.value)}
+          />
+        )}
+        {content?.kind === 'text' && !editable && <pre className="editor readonly">{content.text}</pre>}
+        {content?.kind === 'empty' && (
+          <div className="empty" onClick={() => file.key === 'source' && onAddScreenshot()}>
+            <p>{emptyCopy(file.key)}</p>
+            {content.error && <p className="empty-error">{content.error}</p>}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function pairFor(key: FileKey, files: ProblemFileView[]): FilePair {
+  const tex = fileByKey(files, 'problemText')
+  const texReady = Boolean(tex && tex.state !== 'empty' && tex.state !== 'failed')
+  if (key === 'source' || (key === 'problemText' && !texReady)) {
+    return {
+      left: 'source',
+      right: 'problemText',
+      title: 'Screenshot to TeX',
+      action: 'generate-tex',
+      label: 'Generate TeX problem',
+      busyLabel: 'Generating TeX…'
+    }
+  }
+  if (key === 'problemText' || key === 'problemPdf') {
+    return {
+      left: 'problemText',
+      right: 'problemPdf',
+      title: 'TeX to PDF',
+      action: 'generate-pdf',
+      label: 'Generate PDF',
+      busyLabel: 'Generating PDF…',
+      texKey: 'problemText'
+    }
+  }
+  if (key === 'leanStub') {
+    return {
+      left: 'problemText',
+      right: 'leanStub',
+      title: 'TeX to Lean stub',
+      action: 'unavailable',
+      label: 'Generate Lean stub',
+      busyLabel: 'Generate Lean stub'
+    }
+  }
+  if (key === 'leanProof') {
+    return {
+      left: 'leanStub',
+      right: 'leanProof',
+      title: 'Lean stub to proof',
+      action: 'unavailable',
+      label: 'Generate Lean proof',
+      busyLabel: 'Generate Lean proof'
+    }
+  }
+  if (key === 'readable') {
+    return {
+      left: 'leanProof',
+      right: 'readable',
+      title: 'Proof to readable TeX',
+      action: 'unavailable',
+      label: 'Generate readable proof',
+      busyLabel: 'Generate readable proof'
+    }
+  }
+  return {
+    left: 'readable',
+    right: 'readablePdf',
+    title: 'Readable TeX to PDF',
+    action: 'generate-pdf',
+    label: 'Generate PDF',
+    busyLabel: 'Generating PDF…',
+    texKey: 'readable'
+  }
+}
+
+function actionFor(pair: FilePair, files: ProblemFileView[], busy: 'transcribe' | 'pdf' | null): { label: string; enabled: boolean } {
+  if (pair.action === 'unavailable') return { label: pair.label, enabled: false }
+  if (pair.action === 'generate-tex') {
+    const source = fileByKey(files, 'source')
+    if (!source || source.state === 'empty' || source.state === 'failed') {
+      return { label: 'Add screenshot', enabled: !busy }
+    }
+    return { label: busy === 'transcribe' ? pair.busyLabel : pair.label, enabled: !busy }
+  }
+  const tex = pair.texKey ? fileByKey(files, pair.texKey) : undefined
+  const ready = Boolean(tex && (tex.state === 'current' || tex.state === 'stale'))
+  return { label: busy === 'pdf' ? pair.busyLabel : pair.label, enabled: ready && !busy }
+}
+
+function fileName(problem: ProblemSummary | null, key: FileKey): string {
+  return fileByKey(problem?.files ?? [], key)?.filename ?? key
+}
+
+function emptyCopy(key: FileKey): string {
+  switch (key) {
+    case 'source':
+      return 'Drop a screenshot here, or paste with Cmd+V.'
+    case 'problemText':
+      return 'problem.tex is created when you generate the TeX problem from the screenshot.'
+    case 'problemPdf':
+      return 'problem.pdf is created when you generate a PDF from problem.tex.'
+    case 'leanStub':
+      return 'Generate Lean stub is not available in this version.'
+    case 'leanProof':
+      return 'Generate Lean proof is not available in this version.'
+    case 'readable':
+      return 'Generate readable proof is not available in this version.'
+    case 'readablePdf':
+      return 'This PDF is created from readable.tex.'
+  }
+}
+
+function imageFromClipboard(data: DataTransfer | null): File | null {
+  if (!data) return null
+  const fromFiles = [...data.files].find((item) => ACCEPTED.has(item.type))
+  if (fromFiles) return fromFiles
+  const item = [...data.items].find((entry) => ACCEPTED.has(entry.type))
+  return item?.getAsFile() ?? null
+}
+
+function blobToBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result)
+      const comma = result.indexOf(',')
+      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read the screenshot.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+function messageOf(cause: unknown): string {
+  return cause instanceof Error ? cause.message : 'Something went wrong.'
+}

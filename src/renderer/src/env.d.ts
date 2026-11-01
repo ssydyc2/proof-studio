@@ -1,0 +1,22 @@
+import type { FileContent, FileKey, ProblemSummary, TexSourceKey } from '../../shared/problem'
+
+export interface ProofStudioApi {
+  listProblems: () => Promise<ProblemSummary[]>
+  openFolder: () => Promise<{ problems: ProblemSummary[]; id: string } | null>
+  deleteProblem: (id: string) => Promise<ProblemSummary[]>
+  addSource: (id: string, base64: string, mime: string) => Promise<ProblemSummary[]>
+  readFile: (id: string, key: FileKey) => Promise<FileContent>
+  writeText: (id: string, text: string) => Promise<ProblemSummary[]>
+  hasApiKey: () => Promise<boolean>
+  setApiKey: (key: string) => Promise<void>
+  transcribe: (id: string) => Promise<ProblemSummary[]>
+  compilePdf: (id: string, sourceKey: TexSourceKey) => Promise<ProblemSummary[]>
+}
+
+declare global {
+  interface Window {
+    proofStudio: ProofStudioApi
+  }
+}
+
+export {}
