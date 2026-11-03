@@ -170,7 +170,7 @@ async function askMuse(key: string, prompt: string): Promise<string> {
   })
   const response = await client.responses.create({
     model: MODEL,
-    reasoning: { effort: 'high' },
+    reasoning: { effort: 'xhigh' },
     input: [
       {
         role: 'user',
