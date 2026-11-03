@@ -585,7 +585,7 @@ button:disabled:hover {
   flex: 0 0 auto;
   flex-direction: column;
   gap: 8px;
-  max-height: 112px;
+  max-height: 224px;
   margin: 0;
   padding: 8px 10px;
   overflow-x: hidden;
