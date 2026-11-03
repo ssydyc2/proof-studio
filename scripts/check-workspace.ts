@@ -72,6 +72,18 @@ assert.equal(withStub.nextStep, 'prove')
 assert.equal(fs.existsSync(path.join(folder, 'stub.lean')), false)
 assert.equal(fs.readFileSync(path.join(folder, 'lean', 'stub.lean'), 'utf8'), stubSource)
 
+const proofSource = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement1 : Nat.Prime 2 := by
+  decide
+`
+const { writeLeanProof } = await import('../src/main/workspace')
+const withProof = writeLeanProof(compiled.id, proofSource)
+assert.equal(withProof.files.find((file) => file.key === 'leanProof')?.state, 'current')
+assert.equal(withProof.nextStep, 'explain')
+assert.equal(fs.existsSync(path.join(folder, 'proof.lean')), false)
+assert.equal(fs.readFileSync(path.join(folder, 'lean', 'proof.lean'), 'utf8'), proofSource)
+
 const { compileLeanSource, installLeanProject } = await import('../src/main/lean')
 await installLeanProject(path.join(folder, 'lean'))
 assert.equal(fs.existsSync(path.join(folder, 'lakefile.toml')), false)
@@ -243,5 +255,118 @@ await assert.rejects(
 )
 assert.equal(failureAsks, 2)
 assert.equal(failures, 2)
+
+const { proofError, proveSource, statementsOf } = await import('../src/main/prove')
+const two = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement1 : Nat.Prime 2 := by
+  sorry
+
+theorem statement2 : Nat.Prime (0 + 2) := by
+  sorry
+`
+const split = statementsOf(two)
+assert.equal(split.length, 2)
+assert.match(split[0].file, /theorem statement1/)
+assert.doesNotMatch(split[0].file, /theorem statement2/)
+assert.match(split[1].file, /theorem statement2/)
+assert.doesNotMatch(split[1].file, /theorem statement1/)
+assert.match(split[0].file, /import Mathlib.Data.Nat.Prime.Defs/)
+assert.match(split[1].file, /import Mathlib.Data.Nat.Prime.Defs/)
+
+const proved1 = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement1 : Nat.Prime 2 := by
+  decide
+`
+let proveAsks = 0
+const provePrompts: string[] = []
+let proveCompiles = 0
+const firstProof = await proveSource({
+  stub: two,
+  toolchain: 'leanprover/lean4:v4.31.0',
+  ask: async (prompt) => {
+    provePrompts.push(prompt)
+    proveAsks += 1
+    if (proveAsks === 1) return split[0].file
+    return proved1
+  },
+  compile: async (source) => {
+    proveCompiles += 1
+    assert.equal(source, proved1.trim())
+    assert.doesNotMatch(source, /\bsorry\b/)
+    return { ok: true }
+  }
+})
+assert.equal(proveAsks, 2)
+assert.equal(proveCompiles, 1)
+assert.equal(firstProof, proved1.trim())
+assert.match(provePrompts[0], /Prove only statement1/)
+assert.doesNotMatch(provePrompts[0], /theorem statement2/)
+assert.match(provePrompts[1], /must not contain sorry/)
+assert.doesNotMatch(provePrompts[1], /theorem statement2/)
+
+const proved2 = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement2 : Nat.Prime (0 + 2) := by
+  decide
+`
+let secondAsks = 0
+const secondPrompts: string[] = []
+const secondProof = await proveSource({
+  stub: two,
+  toolchain: 'leanprover/lean4:v4.31.0',
+  ask: async (prompt) => {
+    secondPrompts.push(prompt)
+    secondAsks += 1
+    if (secondAsks <= 3) return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
+    return proved2
+  },
+  compile: async (source) => {
+    if (source === proved2.trim()) return { ok: true }
+    return { ok: false, output: 'stub.lean:3:2: error: type mismatch' }
+  }
+})
+assert.equal(secondAsks, 4)
+assert.equal(secondProof, proved2.trim())
+assert.match(secondPrompts[0], /theorem statement1/)
+assert.doesNotMatch(secondPrompts[0], /theorem statement2/)
+assert.match(secondPrompts[2], /Prove statement1 again/)
+assert.match(secondPrompts[3], /theorem statement2/)
+assert.doesNotMatch(secondPrompts[3], /theorem statement1/)
+assert.doesNotMatch(secondPrompts[3], /This attempt failed/)
+
+let changedCompiles = 0
+await assert.rejects(
+  proveSource({
+    stub: split[0].file,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    ask: async () => 'theorem statement1 : True := by\n  trivial',
+    compile: async () => {
+      changedCompiles += 1
+      return { ok: true }
+    }
+  }),
+  /statement1 failed after 3 attempts/
+)
+assert.equal(changedCompiles, 0)
+assert.match(proofError('theorem statement1 : True := by trivial\n', split[0]), /Do not change the statement/)
+
+let bothAsks = 0
+await assert.rejects(
+  proveSource({
+    stub: two,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    ask: async () => {
+      bothAsks += 1
+      return bothAsks <= 3 ? split[0].file : split[1].file
+    },
+    compile: async () => {
+      throw new Error('sorry must not be compiled')
+    }
+  }),
+  /statement1 failed after 3 attempts\. statement2 failed after 3 attempts/
+)
+assert.equal(bothAsks, 6)
 
 console.log(`workspace check passed in ${root}`)

@@ -77,7 +77,7 @@ export const STEP_LABEL: Record<NextStep, string> = {
 }
 
 export function stepEnabled(step: NextStep | null): boolean {
-  return step === 'add-screenshot' || step === 'transcribe' || step === 'formalize'
+  return step === 'add-screenshot' || step === 'transcribe' || step === 'formalize' || step === 'prove'
 }
 
 export function fileState(

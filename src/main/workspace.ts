@@ -84,6 +84,7 @@ const OWNED_FILES = [
   'problem.pdf',
   'stub.lean',
   'lean/stub.lean',
+  'lean/proof.lean',
   'lean-toolchain',
   'lakefile.toml',
   'lake-manifest.json',
@@ -200,6 +201,23 @@ export function writeLeanStub(id: string, text: string): ProblemSummary {
   return summarize(dir, meta)
 }
 
+export function writeLeanProof(id: string, text: string): ProblemSummary {
+  const dir = problemDir(id)
+  const meta = requireMeta(dir)
+  const file = path.join(dir, LEAN_DIR, 'proof.lean')
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, text)
+  const legacy = path.join(dir, 'proof.lean')
+  if (fs.existsSync(legacy)) fs.unlinkSync(legacy)
+  meta.updatedAt = new Date().toISOString()
+  if (meta.errors?.leanProof) {
+    delete meta.errors.leanProof
+    if (Object.keys(meta.errors).length === 0) delete meta.errors
+  }
+  writeMeta(dir, meta)
+  return summarize(dir, meta)
+}
+
 export function recordProblemError(id: string, key: FileKey, message: string): void {
   const dir = problemDir(id)
   const meta = requireMeta(dir)
@@ -297,6 +315,7 @@ function adoptLegacyProblems(): void {
 function storedPath(dir: string, key: FileKey, meta: ProblemMeta): string {
   if (key === 'source') return path.join(dir, meta.sourceFilename ?? 'source.png')
   if (key === 'leanStub') return path.join(dir, LEAN_DIR, 'stub.lean')
+  if (key === 'leanProof') return path.join(dir, LEAN_DIR, 'proof.lean')
   const entry = PROBLEM_FILES.find((item) => item.key === key)
   return path.join(dir, entry?.filename ?? key)
 }

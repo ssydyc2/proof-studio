@@ -2,9 +2,19 @@ import path from 'node:path'
 import OpenAI from 'openai'
 import { formalizeSource } from './formalize'
 import { compileLeanSource, installLeanProject, prepareLean, removeLeanProject } from './lean'
+import { proveSource } from './prove'
 import { FORMALIZE_ATTEMPTS, type FormalizeProgress } from '../shared/formalize'
+import { PROOF_ATTEMPTS, type ProveProgress } from '../shared/prove'
 import { ensureLatexDocument, LEAN_DIR, type ProblemSummary } from '../shared/problem'
-import { problemDirectory, readFile, readSource, recordProblemError, writeLeanStub, writeProblemText } from './workspace'
+import {
+  problemDirectory,
+  readFile,
+  readSource,
+  recordProblemError,
+  writeLeanProof,
+  writeLeanStub,
+  writeProblemText
+} from './workspace'
 
 const MODEL = 'muse-wonder-1.0'
 const BASE_URL = 'https://api.meta.ai/v1'
@@ -105,6 +115,43 @@ export async function formalizeProblem(
   }
 }
 
+export async function proveProblem(
+  id: string,
+  onProgress?: (progress: ProveProgress) => void
+): Promise<ProblemSummary> {
+  if (!hasApiKey() || !apiKey) throw new Error('Enter an API key first.')
+  const stub = readFile(id, 'leanStub')
+  if (stub.kind !== 'text' || !stub.text.trim()) throw new Error('No Lean stub yet.')
+  const key = apiKey
+  try {
+    const rounds: ProveProgress['rounds'] = []
+    const publish = (progress: ProveProgress) => onProgress?.(progress)
+    publish({ phase: 'setup', statement: 1, attempt: 0, total: PROOF_ATTEMPTS, rounds })
+    const project = await prepareLean()
+    const source = await proveSource({
+      stub: stub.text,
+      toolchain: project.toolchain,
+      onAttempt: (statement, attempt) =>
+        publish({ phase: 'attempt', statement, attempt, total: PROOF_ATTEMPTS, rounds: [...rounds] }),
+      onRound: (round) => {
+        rounds.push(round)
+        publish({
+          phase: 'round',
+          statement: round.statement,
+          attempt: round.attempt,
+          total: PROOF_ATTEMPTS,
+          rounds: [...rounds]
+        })
+      },
+      ask: (prompt) => askMuse(key, prompt),
+      compile: compileLeanSource
+    })
+    return writeLeanProof(id, source)
+  } catch (error) {
+    failStep(id, 'leanProof', explainMuseError(error, key))
+  }
+}
+
 async function askMuse(key: string, prompt: string): Promise<string> {
   const client = new OpenAI({
     apiKey: key,
@@ -144,7 +191,7 @@ function failTranscription(id: string, message: string): never {
   failStep(id, 'problemText', message)
 }
 
-function failStep(id: string, key: 'problemText' | 'leanStub', message: string): never {
+function failStep(id: string, key: 'problemText' | 'leanStub' | 'leanProof', message: string): never {
   if (readFile(id, key).kind !== 'text') recordProblemError(id, key, message)
   throw new Error(message)
 }
