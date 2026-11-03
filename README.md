@@ -11,13 +11,13 @@ The steps are:
 3. Generate the Lean proof.
 4. Write a human-readable proof.
 
-Only step 1 is available. When `problem.tex` exists, you can also compile it to `problem.pdf` with the `pdflatex` on this Mac. Later steps stay visible so you can see the files they will use, and their buttons stay off.
+Steps 1 and 2 are available. Step 2 turns `problem.tex` into `lean/stub.lean`. That folder is a Lake project (`lean-toolchain`, `lakefile.toml`, `lake-manifest.json`) whose Mathlib packages come from one shared build. The app lists `stub.lean` only. Muse writes two Lean statements, each proved by `sorry`. If the first does not compile, the next question asks for it again. If it compiles, the next question appends a second statement and does not add an iff theorem. Each file is checked with `lake env lean`, because a bare `lean` command cannot see Mathlib. A statement that already compiled is kept. When `problem.tex` exists, you can also compile it to `problem.pdf` with the `pdflatex` on this Mac. Later steps stay visible so you can see the files they will use, and their buttons stay off.
 
 A Meta Muse API key is entered in the app and kept in memory until you quit. It is not saved to disk.
 
 ## Run the app
 
-You need Node.js and npm. PDF generation also needs MacTeX, which provides `/Library/TeX/texbin/pdflatex`. The app still opens without it.
+You need Node.js and npm. PDF generation needs MacTeX, which provides `/Library/TeX/texbin/pdflatex`. The Lean stub needs Lean 4, installed with elan. The first stub also downloads Mathlib for that Lean version. The app still opens without them.
 
 ```bash
 npm install

@@ -1,6 +1,10 @@
+import path from 'node:path'
 import OpenAI from 'openai'
-import { ensureLatexDocument, type ProblemSummary } from '../shared/problem'
-import { readFile, readSource, recordProblemError, writeProblemText } from './workspace'
+import { formalizeSource } from './formalize'
+import { compileLeanSource, installLeanProject, prepareLean, removeLeanProject } from './lean'
+import { FORMALIZE_ATTEMPTS, type FormalizeProgress } from '../shared/formalize'
+import { ensureLatexDocument, LEAN_DIR, type ProblemSummary } from '../shared/problem'
+import { problemDirectory, readFile, readSource, recordProblemError, writeLeanStub, writeProblemText } from './workspace'
 
 const MODEL = 'muse-wonder-1.0'
 const BASE_URL = 'https://api.meta.ai/v1'
@@ -66,6 +70,60 @@ async function transcribeImage(key: string, bytes: Buffer, mime: string): Promis
   return stripFence(response.output_text ?? '')
 }
 
+export async function formalizeProblem(
+  id: string,
+  onProgress?: (progress: FormalizeProgress) => void
+): Promise<ProblemSummary> {
+  if (!hasApiKey() || !apiKey) throw new Error('Enter an API key first.')
+  const texFile = readFile(id, 'problemText')
+  if (texFile.kind !== 'text' || !texFile.text.trim()) throw new Error('No problem text yet.')
+  const key = apiKey
+  try {
+    const rounds: FormalizeProgress['rounds'] = []
+    const publish = (progress: FormalizeProgress) => onProgress?.(progress)
+    publish({ phase: 'setup', attempt: 0, total: FORMALIZE_ATTEMPTS, statement: 1, rounds })
+    const project = await prepareLean()
+    const source = await formalizeSource({
+      tex: texFile.text,
+      toolchain: project.toolchain,
+      onAttempt: (attempt, statement) =>
+        publish({ phase: 'attempt', attempt, total: FORMALIZE_ATTEMPTS, statement, rounds: [...rounds] }),
+      onRound: (round) => {
+        rounds.push(round)
+        publish({ phase: 'round', attempt: round.attempt, total: FORMALIZE_ATTEMPTS, statement: 1, rounds: [...rounds] })
+      },
+      ask: (prompt) => askMuse(key, prompt),
+      compile: compileLeanSource
+    })
+    const summary = writeLeanStub(id, source)
+    const dir = problemDirectory(id)
+    await installLeanProject(path.join(dir, LEAN_DIR))
+    removeLeanProject(dir)
+    return summary
+  } catch (error) {
+    failStep(id, 'leanStub', explainMuseError(error, key))
+  }
+}
+
+async function askMuse(key: string, prompt: string): Promise<string> {
+  const client = new OpenAI({
+    apiKey: key,
+    baseURL: BASE_URL,
+    timeout: 300_000
+  })
+  const response = await client.responses.create({
+    model: MODEL,
+    reasoning: { effort: 'high' },
+    input: [
+      {
+        role: 'user',
+        content: [{ type: 'input_text', text: prompt }]
+      }
+    ]
+  })
+  return response.output_text ?? ''
+}
+
 function stripFence(text: string): string {
   const trimmed = text.trim()
   const match = trimmed.match(/^```(?:markdown|md|latex|tex)?\s*([\s\S]*?)\s*```$/i)
@@ -83,7 +141,11 @@ function explainMuseError(error: unknown, key: string): string {
 }
 
 function failTranscription(id: string, message: string): never {
-  if (readFile(id, 'problemText').kind !== 'text') recordProblemError(id, 'problemText', message)
+  failStep(id, 'problemText', message)
+}
+
+function failStep(id: string, key: 'problemText' | 'leanStub', message: string): never {
+  if (readFile(id, key).kind !== 'text') recordProblemError(id, key, message)
   throw new Error(message)
 }
 

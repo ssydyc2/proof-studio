@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { FormalizeProgress, FormalizeRound } from '../../shared/formalize'
 import {
   fileByKey,
   pdfKeyFor,
@@ -18,7 +19,9 @@ const STATE_LABEL = {
   failed: 'Failed'
 } as const
 
-type PairAction = 'generate-tex' | 'generate-pdf' | 'unavailable'
+type PairAction = 'generate-tex' | 'generate-pdf' | 'generate-lean' | 'unavailable'
+
+type Busy = 'transcribe' | 'pdf' | 'formalize' | null
 
 type FilePair = {
   left: FileKey
@@ -37,7 +40,9 @@ export function App() {
   const [leftContent, setLeftContent] = useState<FileContent | null>(null)
   const [rightContent, setRightContent] = useState<FileContent | null>(null)
   const [draft, setDraft] = useState('')
-  const [busy, setBusy] = useState<'transcribe' | 'pdf' | null>(null)
+  const [busy, setBusy] = useState<Busy>(null)
+  const [formalizeProgress, setFormalizeProgress] = useState<FormalizeProgress | null>(null)
+  const [formalizeRounds, setFormalizeRounds] = useState<FormalizeRound[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<ProblemSummary | null>(null)
   const [keyOpen, setKeyOpen] = useState(false)
@@ -48,7 +53,7 @@ export function App() {
   const [checkingTools, setCheckingTools] = useState(false)
   const loaded = useRef('')
   const fileInput = useRef<HTMLInputElement>(null)
-  const pendingAfterKey = useRef(false)
+  const pendingAfterKey = useRef<'transcribe' | 'formalize' | null>(null)
 
   const selected = problems.find((problem) => problem.id === selectedId) ?? null
   const pair = selected ? pairFor(selectedFile, selected.files) : null
@@ -62,6 +67,10 @@ export function App() {
     })
     void window.proofStudio.hasApiKey().then(setKeySet)
     void refreshTools()
+    return window.proofStudio.onFormalizeProgress((progress) => {
+      setFormalizeProgress(progress)
+      setFormalizeRounds(progress.rounds)
+    })
   }, [])
 
   useEffect(() => {
@@ -189,6 +198,30 @@ export function App() {
     }
   }
 
+  async function formalize(id: string) {
+    setBusy('formalize')
+    setFormalizeProgress(null)
+    setFormalizeRounds([])
+    setError(null)
+    try {
+      if (draft !== loaded.current) {
+        const saved = await window.proofStudio.writeText(id, draft)
+        loaded.current = draft
+        setProblems(saved)
+      }
+      const nextProblems = await window.proofStudio.formalize(id)
+      setProblems(nextProblems)
+      setSelectedFile('leanStub')
+      setLoadTick((tick) => tick + 1)
+    } catch (cause) {
+      setError(messageOf(cause))
+      setProblems(await window.proofStudio.listProblems())
+    } finally {
+      setBusy(null)
+      setFormalizeProgress(null)
+    }
+  }
+
   async function saveKey(event: React.FormEvent) {
     event.preventDefault()
     try {
@@ -196,9 +229,10 @@ export function App() {
       setKeyDraft('')
       setKeySet(true)
       setKeyOpen(false)
-      const shouldTranscribe = pendingAfterKey.current
-      pendingAfterKey.current = false
-      if (shouldTranscribe && selected) await transcribe(selected.id)
+      const pending = pendingAfterKey.current
+      pendingAfterKey.current = null
+      if (pending === 'transcribe' && selected) await transcribe(selected.id)
+      if (pending === 'formalize' && selected) await formalize(selected.id)
     } catch (cause) {
       setError(messageOf(cause))
     }
@@ -235,17 +269,28 @@ export function App() {
         return
       }
       if (!(await window.proofStudio.hasApiKey())) {
-        pendingAfterKey.current = true
+        pendingAfterKey.current = 'transcribe'
         setKeyOpen(true)
         return
       }
       await transcribe(selected.id)
       return
     }
+    if (pair.action === 'generate-lean') {
+      const tex = fileByKey(selected.files, 'problemText')
+      if (!tex || (tex.state !== 'current' && tex.state !== 'stale')) return
+      if (!(await window.proofStudio.hasApiKey())) {
+        pendingAfterKey.current = 'formalize'
+        setKeyOpen(true)
+        return
+      }
+      await formalize(selected.id)
+      return
+    }
     if (pair.action === 'generate-pdf' && pair.texKey) await makePdf(pair.texKey)
   }
 
-  const action = selected && pair ? actionFor(pair, selected.files, busy) : null
+  const action = selected && pair ? actionFor(pair, selected.files, busy, formalizeProgress) : null
 
   return (
     <div
@@ -351,7 +396,7 @@ export function App() {
           className="key-button"
           type="button"
           onClick={() => {
-            pendingAfterKey.current = false
+            pendingAfterKey.current = null
             setKeyOpen(true)
           }}
         >
@@ -395,6 +440,24 @@ export function App() {
             </button>
           )}
         </header>
+        {(formalizeProgress || formalizeRounds.length > 0) && (
+          <div className="status-bar" aria-live="polite">
+            {formalizeProgress?.phase === 'setup' && <p className="status-wait">Preparing Lean…</p>}
+            {formalizeProgress?.phase === 'attempt' && formalizeRounds.length < formalizeProgress.attempt && (
+              <p className="status-wait">Waiting for statement {formalizeProgress.statement}…</p>
+            )}
+            {formalizeRounds.map((round) => (
+              <p key={round.attempt} className="status-round">
+                <span className="status-index">{round.attempt}</span>
+                <span className="status-state" data-ok={round.ok}>
+                  {round.ok ? 'Compiled' : 'Failed'}
+                </span>
+                <code title={round.returned}>{round.returned}</code>
+                <span className="status-detail">{round.detail}</span>
+              </p>
+            ))}
+          </div>
+        )}
         {error && (
           <p className="banner" role="alert">
             <Icon name="alert" size={15} />
@@ -477,7 +540,7 @@ export function App() {
                 className="secondary"
                 type="button"
                 onClick={() => {
-                  pendingAfterKey.current = false
+                  pendingAfterKey.current = null
                   setKeyOpen(false)
                   setKeyDraft('')
                 }}
@@ -627,9 +690,9 @@ function pairFor(key: FileKey, files: ProblemFileView[]): FilePair {
       left: 'problemText',
       right: 'leanStub',
       title: 'TeX to Lean stub',
-      action: 'unavailable',
+      action: 'generate-lean',
       label: 'Generate Lean stub',
-      busyLabel: 'Generate Lean stub'
+      busyLabel: 'Generating Lean stub…'
     }
   }
   if (key === 'leanProof') {
@@ -663,7 +726,12 @@ function pairFor(key: FileKey, files: ProblemFileView[]): FilePair {
   }
 }
 
-function actionFor(pair: FilePair, files: ProblemFileView[], busy: 'transcribe' | 'pdf' | null): { label: string; enabled: boolean } {
+function actionFor(
+  pair: FilePair,
+  files: ProblemFileView[],
+  busy: Busy,
+  progress: FormalizeProgress | null
+): { label: string; enabled: boolean } {
   if (pair.action === 'unavailable') return { label: pair.label, enabled: false }
   if (pair.action === 'generate-tex') {
     const source = fileByKey(files, 'source')
@@ -672,9 +740,20 @@ function actionFor(pair: FilePair, files: ProblemFileView[], busy: 'transcribe' 
     }
     return { label: busy === 'transcribe' ? pair.busyLabel : pair.label, enabled: !busy }
   }
+  if (pair.action === 'generate-lean') {
+    const tex = fileByKey(files, 'problemText')
+    const ready = Boolean(tex && (tex.state === 'current' || tex.state === 'stale'))
+    return { label: busy === 'formalize' ? formalizeLabel(progress, pair.busyLabel) : pair.label, enabled: ready && !busy }
+  }
   const tex = pair.texKey ? fileByKey(files, pair.texKey) : undefined
   const ready = Boolean(tex && (tex.state === 'current' || tex.state === 'stale'))
   return { label: busy === 'pdf' ? pair.busyLabel : pair.label, enabled: ready && !busy }
+}
+
+function formalizeLabel(progress: FormalizeProgress | null, fallback: string): string {
+  if (progress?.phase === 'setup') return 'Preparing Lean…'
+  if (progress?.phase === 'attempt') return `Generating statement ${progress.statement} of ${progress.total}…`
+  return fallback
 }
 
 function fileName(problem: ProblemSummary | null, key: FileKey): string {
@@ -690,7 +769,7 @@ function emptyCopy(key: FileKey): string {
     case 'problemPdf':
       return 'problem.pdf is created when you generate a PDF from problem.tex.'
     case 'leanStub':
-      return 'Generate Lean stub is not available in this version.'
+      return 'stub.lean is created from problem.tex and saved in the lean folder. Muse writes two Lean statements of the problem. Each proof is sorry, and Lake checks the file against Mathlib.'
     case 'leanProof':
       return 'Generate Lean proof is not available in this version.'
     case 'readable':

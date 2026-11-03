@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron'
 import path from 'node:path'
 import { compileTex } from './latex'
-import { hasApiKey, setApiKey, transcribeProblem } from './muse'
+import { formalizeProblem, hasApiKey, setApiKey, transcribeProblem } from './muse'
 import { installUrl, toolchainStatus } from './toolchain'
 import { addSource, deleteProblem, listProblems, openProblemFolder, readFile, writeProblemText } from './workspace'
 import { PROBLEM_FILES, type FileKey, type TexSourceKey } from '../shared/problem'
@@ -72,6 +72,12 @@ function registerIpc(): void {
   })
   ipcMain.handle('problems:transcribe', async (_event, id: string) => {
     await transcribeProblem(id)
+    return listProblems()
+  })
+  ipcMain.handle('problems:formalize', async (event, id: string) => {
+    await formalizeProblem(id, (progress) => {
+      event.sender.send('formalize:progress', progress)
+    })
     return listProblems()
   })
   ipcMain.handle('problems:compile', async (_event, id: string, sourceKey: TexSourceKey) => {

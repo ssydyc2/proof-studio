@@ -57,6 +57,32 @@ assert.equal(pdf?.state, 'current')
 const pdfBytes = fs.readFileSync(path.join(folder, 'problem.pdf'))
 assert.equal(pdfBytes.subarray(0, 5).toString(), '%PDF-')
 
+const { writeLeanStub } = await import('../src/main/workspace')
+const stubSource = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement1 : Nat.Prime 2 := by
+  sorry
+
+theorem statement2 : Nat.Prime (0 + 2) := by
+  sorry
+`
+const withStub = writeLeanStub(compiled.id, stubSource)
+assert.equal(withStub.files.find((file) => file.key === 'leanStub')?.state, 'current')
+assert.equal(withStub.nextStep, 'prove')
+assert.equal(fs.existsSync(path.join(folder, 'stub.lean')), false)
+assert.equal(fs.readFileSync(path.join(folder, 'lean', 'stub.lean'), 'utf8'), stubSource)
+
+const { compileLeanSource, installLeanProject } = await import('../src/main/lean')
+await installLeanProject(path.join(folder, 'lean'))
+assert.equal(fs.existsSync(path.join(folder, 'lakefile.toml')), false)
+assert.match(fs.readFileSync(path.join(folder, 'lean', 'lakefile.toml'), 'utf8'), /mathlib/)
+assert.match(fs.readFileSync(path.join(folder, 'lean', 'lean-toolchain'), 'utf8'), /leanprover\/lean4:v/)
+assert.equal(fs.existsSync(path.join(folder, 'lean', 'lake-manifest.json')), true)
+const sharedPackages = fs.readlinkSync(path.join(folder, 'lean', '.lake', 'packages'))
+assert.equal(fs.existsSync(sharedPackages), true)
+const lakeResult = await compileLeanSource(stubSource)
+assert.equal(lakeResult.ok, true)
+
 const sourcePath = path.join(folder, 'source.png')
 const later = new Date(Date.now() + 2000)
 fs.utimesSync(sourcePath, later, later)
@@ -70,6 +96,11 @@ deleteProblem(written.id)
 assert.equal(fs.existsSync(path.join(folder, 'notes.txt')), true)
 assert.equal(fs.existsSync(path.join(folder, 'problem.json')), false)
 assert.equal(fs.existsSync(path.join(folder, 'problem.tex')), false)
+assert.equal(fs.existsSync(path.join(folder, 'stub.lean')), false)
+assert.equal(fs.existsSync(path.join(folder, 'lean')), false)
+assert.equal(fs.existsSync(path.join(folder, 'lakefile.toml')), false)
+assert.equal(fs.existsSync(path.join(folder, '.lake')), false)
+assert.equal(fs.existsSync(sharedPackages), true)
 assert.equal((await import('../src/main/workspace')).listProblems().length, 0)
 
 const removable = path.join(root, 'Empty problem')
@@ -95,5 +126,114 @@ const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'proof-studio-bin-'))
 fs.writeFileSync(path.join(bin, 'pdflatex'), '')
 assert.equal(findExecutable('pdflatex', [bin]), path.join(bin, 'pdflatex'))
 assert.equal(findExecutable('not-a-proof-studio-tool', [bin]), null)
+
+const { compilerFeedback, extractLean, formalizeSource, nextFormulation, summarizeLeanFailure } = await import(
+  '../src/main/formalize'
+)
+const fenced = 'Here is the file.\n```lean\nimport A\n\ntheorem t : True := by\n  sorry\n```\n'
+assert.equal(extractLean(fenced), 'import A\n\ntheorem t : True := by\n  sorry')
+const diagnostic = 'stub.lean:3:8: error: unknown identifier `Foo`\n  Foo\n'
+assert.match(summarizeLeanFailure(diagnostic), /unknown identifier/)
+assert.match(compilerFeedback(diagnostic), /unknown identifier/)
+
+const formulation1 = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement1 : Nat.Prime 2 := by
+  sorry
+`
+const appended = nextFormulation(formulation1.trim(), 'theorem statement2 : Nat.Prime (0 + 2) := by sorry')
+assert.equal(appended.ok, true)
+if (appended.ok) {
+  assert.match(appended.source, /statement1/)
+  assert.match(appended.source, /statement2/)
+  assert.doesNotMatch(appended.source, /iff/)
+}
+const iffReply = `${formulation1}
+theorem statement1_iff_statement2 : statement1 ↔ statement2 := by
+  sorry
+`
+assert.equal(nextFormulation(formulation1.trim(), iffReply).ok, false)
+
+let asks = 0
+const prompts: string[] = []
+const recovered = await formalizeSource({
+  tex: 'Prove that 2 is prime.',
+  toolchain: 'leanprover/lean4:v4.31.0',
+  ask: async (prompt) => {
+    prompts.push(prompt)
+    asks += 1
+    if (asks === 1) return formulation1
+    return 'theorem statement2 : Nat.Prime (0 + 2) := by sorry'
+  },
+  compile: async (source) => {
+    assert.match(source, /\bsorry\b/)
+    assert.doesNotMatch(source, /iff/)
+    return { ok: true }
+  }
+})
+assert.equal(asks, 2)
+assert.match(recovered, /statement1/)
+assert.match(recovered, /statement2/)
+assert.match(prompts[1], /Append theorem statement2/)
+assert.match(prompts[1], /Lean file so far/)
+
+let retryAsks = 0
+const retryPrompts: string[] = []
+const retried = await formalizeSource({
+  tex: 'Prove that 2 is prime.',
+  toolchain: 'leanprover/lean4:v4.31.0',
+  ask: async (prompt) => {
+    retryPrompts.push(prompt)
+    retryAsks += 1
+    return formulation1
+  },
+  compile: async () => {
+    if (retryAsks === 1) return { ok: false, output: 'stub.lean:1:16: error: unknown identifier `NotAType`' }
+    return { ok: true }
+  }
+})
+assert.equal(retryAsks, 2)
+assert.match(retried, /statement1/)
+assert.doesNotMatch(retried, /statement2/)
+assert.match(retryPrompts[1], /statement1/)
+assert.match(retryPrompts[1], /Write statement1 again/)
+assert.doesNotMatch(retryPrompts[1], /statement2/)
+
+let iffAsks = 0
+const kept = await formalizeSource({
+  tex: 'Prove that 2 is prime.',
+  toolchain: 'leanprover/lean4:v4.31.0',
+  ask: async () => {
+    iffAsks += 1
+    if (iffAsks === 1) return formulation1
+    return 'theorem statement1_iff_statement2 : statement1 ↔ statement2 := by sorry'
+  },
+  compile: async (source) => {
+    assert.doesNotMatch(source, /iff/)
+    return { ok: true }
+  }
+})
+assert.match(kept, /statement1/)
+assert.doesNotMatch(kept, /iff/)
+
+let failures = 0
+let failureAsks = 0
+await assert.rejects(
+  formalizeSource({
+    tex: 'Prove that 2 is prime.',
+    toolchain: 'leanprover/lean4:v4.31.0',
+    ask: async () => {
+      failureAsks += 1
+      return `theorem statement1 : NotAType := by sorry`
+    },
+    compile: async () => {
+      failures += 1
+      return { ok: false, output: 'stub.lean:1:16: error: unknown identifier `NotAType`' }
+    }
+  }),
+  /after 2 attempts/
+)
+assert.equal(failureAsks, 2)
+assert.equal(failures, 2)
 
 console.log(`workspace check passed in ${root}`)

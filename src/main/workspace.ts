@@ -2,7 +2,9 @@ import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { removeLeanProject } from './lean'
 import {
+  LEAN_DIR,
   PROBLEM_FILES,
   buildFileViews,
   nextStep,
@@ -81,6 +83,10 @@ const OWNED_FILES = [
   'problem.tex',
   'problem.pdf',
   'stub.lean',
+  'lean/stub.lean',
+  'lean-toolchain',
+  'lakefile.toml',
+  'lake-manifest.json',
   'proof.lean',
   'readable.tex',
   'readable.pdf',
@@ -96,6 +102,8 @@ export function deleteProblem(id: string): void {
   const meta = requireMeta(dir)
   const names = new Set(OWNED_FILES)
   if (meta.sourceFilename) names.add(path.basename(meta.sourceFilename))
+  removeLeanProject(path.join(dir, LEAN_DIR))
+  removeLeanProject(dir)
   for (const name of names) {
     const full = path.join(dir, name)
     if (fs.existsSync(full) && fs.statSync(full).isFile()) fs.unlinkSync(full)
@@ -103,6 +111,8 @@ export function deleteProblem(id: string): void {
   const registry = readRegistry()
   delete registry[id]
   writeRegistry(registry)
+  const leanDir = path.join(dir, LEAN_DIR)
+  if (fs.existsSync(leanDir) && fs.readdirSync(leanDir).length === 0) fs.rmdirSync(leanDir)
   if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
 }
 
@@ -137,7 +147,7 @@ export function readFile(id: string, key: FileKey): FileContent {
   }
   if (key === 'source') {
     const mime = MIME_BY_EXT[path.extname(snap.filename).slice(1)] ?? 'application/octet-stream'
-    const bytes = fs.readFileSync(path.join(dir, snap.filename))
+    const bytes = fs.readFileSync(storedPath(dir, key, meta))
     return {
       kind: 'image',
       filename: snap.filename,
@@ -145,7 +155,7 @@ export function readFile(id: string, key: FileKey): FileContent {
     }
   }
   if (key === 'problemPdf' || key === 'readablePdf') {
-    const bytes = fs.readFileSync(path.join(dir, snap.filename))
+    const bytes = fs.readFileSync(storedPath(dir, key, meta))
     return {
       kind: 'pdf',
       filename: snap.filename,
@@ -155,7 +165,7 @@ export function readFile(id: string, key: FileKey): FileContent {
   return {
     kind: 'text',
     filename: snap.filename,
-    text: fs.readFileSync(path.join(dir, snap.filename), 'utf8')
+    text: fs.readFileSync(storedPath(dir, key, meta), 'utf8')
   }
 }
 
@@ -167,6 +177,23 @@ export function writeProblemText(id: string, text: string): ProblemSummary {
   meta.updatedAt = new Date().toISOString()
   if (meta.errors?.problemText) {
     delete meta.errors.problemText
+    if (Object.keys(meta.errors).length === 0) delete meta.errors
+  }
+  writeMeta(dir, meta)
+  return summarize(dir, meta)
+}
+
+export function writeLeanStub(id: string, text: string): ProblemSummary {
+  const dir = problemDir(id)
+  const meta = requireMeta(dir)
+  const file = path.join(dir, LEAN_DIR, 'stub.lean')
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, text)
+  const legacy = path.join(dir, 'stub.lean')
+  if (fs.existsSync(legacy)) fs.unlinkSync(legacy)
+  meta.updatedAt = new Date().toISOString()
+  if (meta.errors?.leanStub) {
+    delete meta.errors.leanStub
     if (Object.keys(meta.errors).length === 0) delete meta.errors
   }
   writeMeta(dir, meta)
@@ -225,7 +252,7 @@ function summarize(dir: string, meta: ProblemMeta): ProblemSummary {
 function snapshots(dir: string, meta: ProblemMeta): FileSnapshot[] {
   return PROBLEM_FILES.map((entry) => {
     const filename = entry.key === 'source' ? (meta.sourceFilename ?? entry.filename) : entry.filename
-    const full = path.join(dir, filename)
+    const full = storedPath(dir, entry.key, meta)
     const exists = entry.key === 'source' ? Boolean(meta.sourceFilename && fs.existsSync(full)) : fs.existsSync(full)
     return {
       key: entry.key,
@@ -265,6 +292,13 @@ function adoptLegacyProblems(): void {
     changed = true
   }
   if (changed) writeRegistry(registry)
+}
+
+function storedPath(dir: string, key: FileKey, meta: ProblemMeta): string {
+  if (key === 'source') return path.join(dir, meta.sourceFilename ?? 'source.png')
+  if (key === 'leanStub') return path.join(dir, LEAN_DIR, 'stub.lean')
+  const entry = PROBLEM_FILES.find((item) => item.key === key)
+  return path.join(dir, entry?.filename ?? key)
 }
 
 function problemDir(id: string): string {

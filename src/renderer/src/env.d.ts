@@ -1,3 +1,4 @@
+import type { FormalizeProgress } from '../../shared/formalize'
 import type { FileContent, FileKey, ProblemSummary, TexSourceKey } from '../../shared/problem'
 import type { ToolId, ToolStatus } from '../../shared/toolchain'
 
@@ -11,6 +12,8 @@ export interface ProofStudioApi {
   hasApiKey: () => Promise<boolean>
   setApiKey: (key: string) => Promise<void>
   transcribe: (id: string) => Promise<ProblemSummary[]>
+  formalize: (id: string) => Promise<ProblemSummary[]>
+  onFormalizeProgress: (listener: (progress: FormalizeProgress) => void) => () => void
   compilePdf: (id: string, sourceKey: TexSourceKey) => Promise<ProblemSummary[]>
   toolchainStatus: () => Promise<ToolStatus[]>
   openInstall: (id: ToolId) => Promise<void>
