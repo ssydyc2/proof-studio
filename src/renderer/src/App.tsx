@@ -17,7 +17,7 @@ import type { ToolStatus } from '../../shared/toolchain'
 const ACCEPTED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const STATE_LABEL = {
   empty: 'Empty',
-  current: 'Current',
+  completed: 'Completed',
   stale: 'Stale',
   failed: 'Failed'
 } as const
@@ -371,7 +371,7 @@ export function App() {
     }
     if (pair.action === 'generate-lean') {
       const tex = fileByKey(selected.files, 'problemText')
-      if (!tex || (tex.state !== 'current' && tex.state !== 'stale')) return
+      if (!tex || (tex.state !== 'completed' && tex.state !== 'stale')) return
       if (!(await window.proofStudio.hasApiKey())) {
         pendingAfterKey.current = 'formalize'
         setKeyOpen(true)
@@ -382,7 +382,7 @@ export function App() {
     }
     if (pair.action === 'generate-proof') {
       const stub = fileByKey(selected.files, 'leanStub')
-      if (!stub || (stub.state !== 'current' && stub.state !== 'stale')) return
+      if (!stub || (stub.state !== 'completed' && stub.state !== 'stale')) return
       if (!(await window.proofStudio.hasApiKey())) {
         pendingAfterKey.current = 'prove'
         setKeyOpen(true)
@@ -393,7 +393,7 @@ export function App() {
     }
     if (pair.action === 'generate-solution') {
       const proof = fileByKey(selected.files, 'leanProof')
-      if (!proof || (proof.state !== 'current' && proof.state !== 'stale')) return
+      if (!proof || (proof.state !== 'completed' && proof.state !== 'stale')) return
       if (!(await window.proofStudio.hasApiKey())) {
         pendingAfterKey.current = 'explain'
         setKeyOpen(true)
@@ -927,21 +927,21 @@ function actionFor(
   }
   if (pair.action === 'generate-lean') {
     const tex = fileByKey(files, 'problemText')
-    const ready = Boolean(tex && (tex.state === 'current' || tex.state === 'stale'))
+    const ready = Boolean(tex && (tex.state === 'completed' || tex.state === 'stale'))
     return { label: busy === 'formalize' ? formalizeLabel(progress, pair.busyLabel) : pair.label, enabled: ready && !busy }
   }
   if (pair.action === 'generate-proof') {
     const stub = fileByKey(files, 'leanStub')
-    const ready = Boolean(stub && (stub.state === 'current' || stub.state === 'stale'))
+    const ready = Boolean(stub && (stub.state === 'completed' || stub.state === 'stale'))
     return { label: busy === 'prove' ? proveLabel(proveProgress, pair.busyLabel) : pair.label, enabled: ready && !busy }
   }
   if (pair.action === 'generate-solution') {
     const proof = fileByKey(files, 'leanProof')
-    const ready = Boolean(proof && (proof.state === 'current' || proof.state === 'stale'))
+    const ready = Boolean(proof && (proof.state === 'completed' || proof.state === 'stale'))
     return { label: busy === 'explain' ? explainLabel(explainProgress, pair.busyLabel) : pair.label, enabled: ready && !busy }
   }
   const tex = pair.texKey ? fileByKey(files, pair.texKey) : undefined
-  const ready = Boolean(tex && (tex.state === 'current' || tex.state === 'stale'))
+  const ready = Boolean(tex && (tex.state === 'completed' || tex.state === 'stale'))
   return { label: busy === 'pdf' ? pair.busyLabel : pair.label, enabled: ready && !busy }
 }
 
