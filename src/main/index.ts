@@ -7,13 +7,15 @@ import { PROBLEM_FILES, type FileKey, type TexSourceKey } from '../shared/proble
 
 const FILE_KEYS = new Set<FileKey>(PROBLEM_FILES.map((file) => file.key))
 
+app.setName('ProofStudio')
+
 function createWindow(): void {
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 980,
     minHeight: 620,
-    title: 'Proof Studio',
+    title: 'ProofStudio',
     backgroundColor: '#f4f6fa',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 18, y: 18 },
