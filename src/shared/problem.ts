@@ -1,11 +1,12 @@
-export const LEAN_DIR = 'lean'
+export const PROBLEM_ENV = 'problem'
+export const SOLUTION_ENV = 'solution'
 
 export const PROBLEM_FILES = [
   { key: 'source', filename: 'source.png', label: 'Screenshot' },
   { key: 'problemText', filename: 'problem.tex', label: 'Problem text' },
   { key: 'problemPdf', filename: 'problem.pdf', label: 'Problem PDF' },
-  { key: 'leanStub', filename: 'stub.lean', label: 'Lean stub' },
-  { key: 'leanProof', filename: 'proof.lean', label: 'Lean proof' },
+  { key: 'leanStub', filename: 'problem/stub.lean', label: 'Lean stub' },
+  { key: 'leanProof', filename: 'solution/proof.lean', label: 'Lean proof' },
   { key: 'readable', filename: 'readable.tex', label: 'Readable proof' },
   { key: 'readablePdf', filename: 'readable.pdf', label: 'Readable PDF' }
 ] as const
@@ -77,7 +78,7 @@ export const STEP_LABEL: Record<NextStep, string> = {
 }
 
 export function stepEnabled(step: NextStep | null): boolean {
-  return step === 'add-screenshot' || step === 'transcribe' || step === 'formalize'
+  return step === 'add-screenshot' || step === 'transcribe' || step === 'formalize' || step === 'prove'
 }
 
 export function fileState(

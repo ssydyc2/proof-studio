@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { FormalizeProgress } from '../shared/formalize'
+import type { ProveProgress } from '../shared/prove'
 import type { FileContent, FileKey, ProblemSummary, TexSourceKey } from '../shared/problem'
 import type { ToolId, ToolStatus } from '../shared/toolchain'
 
@@ -22,6 +23,15 @@ const api = {
     ipcRenderer.on('formalize:progress', wrapped)
     return () => {
       ipcRenderer.removeListener('formalize:progress', wrapped)
+    }
+  },
+  prove: (id: string, attempts: number): Promise<ProblemSummary[]> =>
+    ipcRenderer.invoke('problems:prove', id, attempts),
+  onProveProgress: (listener: (progress: ProveProgress) => void): (() => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, progress: ProveProgress) => listener(progress)
+    ipcRenderer.on('prove:progress', wrapped)
+    return () => {
+      ipcRenderer.removeListener('prove:progress', wrapped)
     }
   },
   compilePdf: (id: string, sourceKey: TexSourceKey): Promise<ProblemSummary[]> =>

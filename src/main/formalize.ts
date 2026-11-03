@@ -46,7 +46,7 @@ export async function formalizeSource(options: {
     }
     lastOutput = result.output
     latest = { source, output: result.output }
-    report(false, summarizeLeanFailure(result.output))
+    report(false, compilerFeedback(result.output))
   }
   if (accepted) return accepted
   throw new Error(

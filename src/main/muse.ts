@@ -2,9 +2,19 @@ import path from 'node:path'
 import OpenAI from 'openai'
 import { formalizeSource } from './formalize'
 import { compileLeanSource, installLeanProject, prepareLean, removeLeanProject } from './lean'
+import { proveSource } from './prove'
 import { FORMALIZE_ATTEMPTS, type FormalizeProgress } from '../shared/formalize'
-import { ensureLatexDocument, LEAN_DIR, type ProblemSummary } from '../shared/problem'
-import { problemDirectory, readFile, readSource, recordProblemError, writeLeanStub, writeProblemText } from './workspace'
+import { proofAttemptCount, type ProveProgress } from '../shared/prove'
+import { ensureLatexDocument, PROBLEM_ENV, SOLUTION_ENV, type ProblemSummary } from '../shared/problem'
+import {
+  problemDirectory,
+  readFile,
+  readSource,
+  recordProblemError,
+  writeLeanProof,
+  writeLeanStub,
+  writeProblemText
+} from './workspace'
 
 const MODEL = 'muse-wonder-1.0'
 const BASE_URL = 'https://api.meta.ai/v1'
@@ -97,11 +107,58 @@ export async function formalizeProblem(
     })
     const summary = writeLeanStub(id, source)
     const dir = problemDirectory(id)
-    await installLeanProject(path.join(dir, LEAN_DIR))
+    await installLeanProject(path.join(dir, PROBLEM_ENV))
     removeLeanProject(dir)
     return summary
   } catch (error) {
     failStep(id, 'leanStub', explainMuseError(error, key))
+  }
+}
+
+export async function proveProblem(
+  id: string,
+  attempts: number,
+  onProgress?: (progress: ProveProgress) => void
+): Promise<ProblemSummary> {
+  if (!hasApiKey() || !apiKey) throw new Error('Enter an API key first.')
+  const stub = readFile(id, 'leanStub')
+  if (stub.kind !== 'text' || !stub.text.trim()) throw new Error('No Lean stub yet.')
+  const count = proofAttemptCount(attempts)
+  const key = apiKey
+  try {
+    const rounds: ProveProgress['rounds'] = []
+    let running: ProveProgress['running'] = []
+    const publish = (progress: ProveProgress) => onProgress?.(progress)
+    publish({ phase: 'setup', statement: 1, attempt: 0, total: count, rounds, running })
+    const project = await prepareLean()
+    const source = await proveSource({
+      stub: stub.text,
+      toolchain: project.toolchain,
+      attempts: count,
+      onRunning: (next) => {
+        running = next
+      },
+      onAttempt: (statement, attempt) =>
+        publish({ phase: 'attempt', statement, attempt, total: count, rounds: [...rounds], running: [...(running ?? [])] }),
+      onRound: (round) => {
+        rounds.push(round)
+        publish({
+          phase: 'round',
+          statement: round.statement,
+          attempt: round.attempt,
+          total: count,
+          rounds: [...rounds],
+          running: [...(running ?? [])]
+        })
+      },
+      ask: (prompt) => askMuse(key, prompt),
+      compile: compileLeanSource
+    })
+    const summary = writeLeanProof(id, source)
+    await installLeanProject(path.join(problemDirectory(id), SOLUTION_ENV))
+    return summary
+  } catch (error) {
+    failStep(id, 'leanProof', explainMuseError(error, key))
   }
 }
 
@@ -144,7 +201,7 @@ function failTranscription(id: string, message: string): never {
   failStep(id, 'problemText', message)
 }
 
-function failStep(id: string, key: 'problemText' | 'leanStub', message: string): never {
+function failStep(id: string, key: 'problemText' | 'leanStub' | 'leanProof', message: string): never {
   if (readFile(id, key).kind !== 'text') recordProblemError(id, key, message)
   throw new Error(message)
 }

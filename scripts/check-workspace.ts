@@ -70,15 +70,36 @@ const withStub = writeLeanStub(compiled.id, stubSource)
 assert.equal(withStub.files.find((file) => file.key === 'leanStub')?.state, 'current')
 assert.equal(withStub.nextStep, 'prove')
 assert.equal(fs.existsSync(path.join(folder, 'stub.lean')), false)
-assert.equal(fs.readFileSync(path.join(folder, 'lean', 'stub.lean'), 'utf8'), stubSource)
+assert.equal(fs.readFileSync(path.join(folder, 'problem', 'stub.lean'), 'utf8'), stubSource)
+assert.equal(withStub.files.find((file) => file.key === 'leanStub')?.filename, 'problem/stub.lean')
+
+const proofSource = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement1 : Nat.Prime 2 := by
+  decide
+`
+const { writeLeanProof } = await import('../src/main/workspace')
+const withProof = writeLeanProof(compiled.id, proofSource)
+assert.equal(withProof.files.find((file) => file.key === 'leanProof')?.state, 'current')
+assert.equal(withProof.nextStep, 'explain')
+assert.equal(fs.existsSync(path.join(folder, 'proof.lean')), false)
+assert.equal(fs.readFileSync(path.join(folder, 'solution', 'proof.lean'), 'utf8'), proofSource)
+assert.equal(withProof.files.find((file) => file.key === 'leanProof')?.filename, 'solution/proof.lean')
+assert.equal(fs.existsSync(path.join(folder, 'problem', 'proof.lean')), false)
+assert.equal(fs.existsSync(path.join(folder, 'solution', 'stub.lean')), false)
 
 const { compileLeanSource, installLeanProject } = await import('../src/main/lean')
-await installLeanProject(path.join(folder, 'lean'))
+await installLeanProject(path.join(folder, 'problem'))
+await installLeanProject(path.join(folder, 'solution'))
 assert.equal(fs.existsSync(path.join(folder, 'lakefile.toml')), false)
-assert.match(fs.readFileSync(path.join(folder, 'lean', 'lakefile.toml'), 'utf8'), /mathlib/)
-assert.match(fs.readFileSync(path.join(folder, 'lean', 'lean-toolchain'), 'utf8'), /leanprover\/lean4:v/)
-assert.equal(fs.existsSync(path.join(folder, 'lean', 'lake-manifest.json')), true)
-const sharedPackages = fs.readlinkSync(path.join(folder, 'lean', '.lake', 'packages'))
+assert.match(fs.readFileSync(path.join(folder, 'problem', 'lakefile.toml'), 'utf8'), /mathlib/)
+assert.match(fs.readFileSync(path.join(folder, 'solution', 'lakefile.toml'), 'utf8'), /mathlib/)
+assert.match(fs.readFileSync(path.join(folder, 'problem', 'lean-toolchain'), 'utf8'), /leanprover\/lean4:v/)
+assert.match(fs.readFileSync(path.join(folder, 'solution', 'lean-toolchain'), 'utf8'), /leanprover\/lean4:v/)
+assert.equal(fs.existsSync(path.join(folder, 'problem', 'lake-manifest.json')), true)
+assert.equal(fs.existsSync(path.join(folder, 'solution', 'lake-manifest.json')), true)
+const sharedPackages = fs.readlinkSync(path.join(folder, 'problem', '.lake', 'packages'))
+assert.equal(fs.readlinkSync(path.join(folder, 'solution', '.lake', 'packages')), sharedPackages)
 assert.equal(fs.existsSync(sharedPackages), true)
 const lakeResult = await compileLeanSource(stubSource)
 assert.equal(lakeResult.ok, true)
@@ -98,10 +119,28 @@ assert.equal(fs.existsSync(path.join(folder, 'problem.json')), false)
 assert.equal(fs.existsSync(path.join(folder, 'problem.tex')), false)
 assert.equal(fs.existsSync(path.join(folder, 'stub.lean')), false)
 assert.equal(fs.existsSync(path.join(folder, 'lean')), false)
+assert.equal(fs.existsSync(path.join(folder, 'problem')), false)
+assert.equal(fs.existsSync(path.join(folder, 'solution')), false)
 assert.equal(fs.existsSync(path.join(folder, 'lakefile.toml')), false)
 assert.equal(fs.existsSync(path.join(folder, '.lake')), false)
 assert.equal(fs.existsSync(sharedPackages), true)
 assert.equal((await import('../src/main/workspace')).listProblems().length, 0)
+
+const legacyDir = path.join(root, 'Legacy layout')
+fs.mkdirSync(path.join(legacyDir, 'lean'), { recursive: true })
+fs.writeFileSync(path.join(legacyDir, 'lean', 'stub.lean'), stubSource)
+fs.writeFileSync(path.join(legacyDir, 'lean', 'proof.lean'), proofSource)
+fs.writeFileSync(path.join(legacyDir, 'lean', 'lean-toolchain'), 'leanprover/lean4:v4.31.0\n')
+const legacy = (await import('../src/main/workspace')).openProblemFolder(legacyDir)
+assert.equal(fs.readFileSync(path.join(legacyDir, 'problem', 'stub.lean'), 'utf8'), stubSource)
+assert.equal(fs.readFileSync(path.join(legacyDir, 'solution', 'proof.lean'), 'utf8'), proofSource)
+assert.equal(fs.readFileSync(path.join(legacyDir, 'problem', 'lean-toolchain'), 'utf8'), 'leanprover/lean4:v4.31.0\n')
+assert.equal(fs.readFileSync(path.join(legacyDir, 'solution', 'lean-toolchain'), 'utf8'), 'leanprover/lean4:v4.31.0\n')
+assert.equal(fs.existsSync(path.join(legacyDir, 'lean', 'stub.lean')), false)
+assert.equal(fs.existsSync(path.join(legacyDir, 'lean', 'proof.lean')), false)
+assert.equal(legacy.files.find((file) => file.key === 'leanStub')?.state, 'current')
+assert.equal(legacy.files.find((file) => file.key === 'leanProof')?.state, 'current')
+deleteProblem(legacy.id)
 
 const removable = path.join(root, 'Empty problem')
 fs.mkdirSync(removable)
@@ -243,5 +282,182 @@ await assert.rejects(
 )
 assert.equal(failureAsks, 2)
 assert.equal(failures, 2)
+
+const { proofError, proveSource, statementsOf } = await import('../src/main/prove')
+const two = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement1 : Nat.Prime 2 := by
+  sorry
+
+theorem statement2 : Nat.Prime (0 + 2) := by
+  sorry
+`
+const split = statementsOf(two)
+assert.equal(split.length, 2)
+assert.match(split[0].file, /theorem statement1/)
+assert.doesNotMatch(split[0].file, /theorem statement2/)
+assert.match(split[1].file, /theorem statement2/)
+assert.doesNotMatch(split[1].file, /theorem statement1/)
+assert.match(split[0].file, /import Mathlib.Data.Nat.Prime.Defs/)
+assert.match(split[1].file, /import Mathlib.Data.Nat.Prime.Defs/)
+
+const proved1 = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement1 : Nat.Prime 2 := by
+  decide
+`
+let releaseSecond: () => void = () => {}
+const holdSecond = new Promise<void>((resolve) => {
+  releaseSecond = resolve
+})
+let secondStarted = 0
+const provePrompts: string[] = []
+let proveCompiles = 0
+const firstProof = await proveSource({
+  stub: two,
+  toolchain: 'leanprover/lean4:v4.31.0',
+  ask: async (prompt) => {
+    provePrompts.push(prompt)
+    if (prompt.includes('Prove only statement2')) {
+      secondStarted += 1
+      await holdSecond
+      return split[1].file
+    }
+    if (prompt.includes('Earlier attempts failed')) return proved1
+    return split[0].file
+  },
+  compile: async (source) => {
+    proveCompiles += 1
+    assert.equal(source, proved1.trim())
+    assert.doesNotMatch(source, /\bsorry\b/)
+    setTimeout(releaseSecond, 0)
+    return { ok: true }
+  }
+})
+assert.equal(secondStarted, 1)
+assert.equal(proveCompiles, 1)
+assert.equal(firstProof, proved1.trim())
+const statement1Prompts = provePrompts.filter((prompt) => prompt.includes('Prove only statement1'))
+assert.equal(statement1Prompts.length, 2)
+assert.doesNotMatch(statement1Prompts[0], /theorem statement2/)
+assert.match(statement1Prompts[1], /must not contain sorry/)
+assert.doesNotMatch(statement1Prompts[1], /theorem statement2/)
+
+const proved2 = `import Mathlib.Data.Nat.Prime.Defs
+
+theorem statement2 : Nat.Prime (0 + 2) := by
+  decide
+`
+const historyPrompts: string[] = []
+await assert.rejects(
+  proveSource({
+    stub: two,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    ask: async (prompt) => {
+      if (prompt.includes('Prove only statement2')) return split[1].file
+      historyPrompts.push(prompt)
+      if (historyPrompts.length === 1) return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
+      if (historyPrompts.length === 2) return 'theorem statement1 : Nat.Prime 2 := by\n  exact False'
+      return 'theorem statement1 : Nat.Prime 2 := by\n  exact Nat'
+    },
+    compile: async () => ({ ok: false, output: 'stub.lean:3:2: error: type mismatch' })
+  }),
+  /statement1 failed after 3 attempts/
+)
+assert.equal(historyPrompts.length, 3)
+assert.match(historyPrompts[1], /exact True/)
+assert.doesNotMatch(historyPrompts[1], /exact False/)
+assert.match(historyPrompts[2], /Prove statement1 again/)
+assert.match(historyPrompts[2], /Attempt 1/)
+assert.match(historyPrompts[2], /exact True/)
+assert.match(historyPrompts[2], /Attempt 2/)
+assert.match(historyPrompts[2], /exact False/)
+
+let releaseFirst: () => void = () => {}
+const holdFirst = new Promise<void>((resolve) => {
+  releaseFirst = resolve
+})
+let firstStarted = 0
+const raced = await proveSource({
+  stub: two,
+  toolchain: 'leanprover/lean4:v4.31.0',
+  ask: async (prompt) => {
+    if (prompt.includes('Prove only statement1')) {
+      firstStarted += 1
+      await holdFirst
+      return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
+    }
+    return proved2
+  },
+  compile: async (source) => {
+    if (source === proved2.trim()) {
+      setTimeout(releaseFirst, 0)
+      return { ok: true }
+    }
+    return { ok: false, output: 'stub.lean:3:2: error: type mismatch' }
+  }
+})
+assert.equal(raced, proved2.trim())
+assert.equal(firstStarted, 1)
+
+let changedCompiles = 0
+await assert.rejects(
+  proveSource({
+    stub: split[0].file,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    ask: async () => 'theorem statement1 : True := by\n  trivial',
+    compile: async () => {
+      changedCompiles += 1
+      return { ok: true }
+    }
+  }),
+  /statement1 failed after 3 attempts/
+)
+assert.equal(changedCompiles, 0)
+assert.match(proofError('theorem statement1 : True := by trivial\n', split[0]), /Do not change the statement/)
+
+let bothAsks = 0
+await assert.rejects(
+  proveSource({
+    stub: two,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    ask: async (prompt) => {
+      bothAsks += 1
+      return prompt.includes('Prove only statement2') ? split[1].file : split[0].file
+    },
+    compile: async () => {
+      throw new Error('sorry must not be compiled')
+    }
+  }),
+  /statement1 failed after 3 attempts\. statement2 failed after 3 attempts/
+)
+assert.equal(bothAsks, 6)
+
+let oneAsk = 0
+await assert.rejects(
+  proveSource({
+    stub: split[0].file,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    attempts: 1,
+    ask: async () => {
+      oneAsk += 1
+      return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
+    },
+    compile: async () => ({ ok: false, output: 'stub.lean:3:2: error: type mismatch\n  exact True' })
+  }),
+  /statement1 failed after 1 attempt/
+)
+assert.equal(oneAsk, 1)
+
+await assert.rejects(
+  proveSource({
+    stub: split[0].file,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    attempts: 0,
+    ask: async () => split[0].file,
+    compile: async () => ({ ok: true })
+  }),
+  /from 1 to 10/
+)
 
 console.log(`workspace check passed in ${root}`)

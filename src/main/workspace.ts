@@ -4,8 +4,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { removeLeanProject } from './lean'
 import {
-  LEAN_DIR,
+  PROBLEM_ENV,
   PROBLEM_FILES,
+  SOLUTION_ENV,
   buildFileViews,
   nextStep,
   type FileContent,
@@ -84,6 +85,9 @@ const OWNED_FILES = [
   'problem.pdf',
   'stub.lean',
   'lean/stub.lean',
+  'lean/proof.lean',
+  'problem/stub.lean',
+  'solution/proof.lean',
   'lean-toolchain',
   'lakefile.toml',
   'lake-manifest.json',
@@ -102,7 +106,7 @@ export function deleteProblem(id: string): void {
   const meta = requireMeta(dir)
   const names = new Set(OWNED_FILES)
   if (meta.sourceFilename) names.add(path.basename(meta.sourceFilename))
-  removeLeanProject(path.join(dir, LEAN_DIR))
+  for (const name of ['problem', 'solution', 'lean']) removeLeanProject(path.join(dir, name))
   removeLeanProject(dir)
   for (const name of names) {
     const full = path.join(dir, name)
@@ -111,8 +115,7 @@ export function deleteProblem(id: string): void {
   const registry = readRegistry()
   delete registry[id]
   writeRegistry(registry)
-  const leanDir = path.join(dir, LEAN_DIR)
-  if (fs.existsSync(leanDir) && fs.readdirSync(leanDir).length === 0) fs.rmdirSync(leanDir)
+  for (const name of ['problem', 'solution', 'lean']) removeDirIfEmpty(path.join(dir, name))
   if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
 }
 
@@ -186,14 +189,33 @@ export function writeProblemText(id: string, text: string): ProblemSummary {
 export function writeLeanStub(id: string, text: string): ProblemSummary {
   const dir = problemDir(id)
   const meta = requireMeta(dir)
-  const file = path.join(dir, LEAN_DIR, 'stub.lean')
+  const file = path.join(dir, PROBLEM_ENV, 'stub.lean')
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.writeFileSync(file, text)
-  const legacy = path.join(dir, 'stub.lean')
-  if (fs.existsSync(legacy)) fs.unlinkSync(legacy)
+  for (const legacy of [path.join(dir, 'stub.lean'), path.join(dir, 'lean', 'stub.lean')]) {
+    if (legacy !== file && fs.existsSync(legacy)) fs.unlinkSync(legacy)
+  }
   meta.updatedAt = new Date().toISOString()
   if (meta.errors?.leanStub) {
     delete meta.errors.leanStub
+    if (Object.keys(meta.errors).length === 0) delete meta.errors
+  }
+  writeMeta(dir, meta)
+  return summarize(dir, meta)
+}
+
+export function writeLeanProof(id: string, text: string): ProblemSummary {
+  const dir = problemDir(id)
+  const meta = requireMeta(dir)
+  const file = path.join(dir, SOLUTION_ENV, 'proof.lean')
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, text)
+  for (const legacy of [path.join(dir, 'proof.lean'), path.join(dir, 'lean', 'proof.lean')]) {
+    if (legacy !== file && fs.existsSync(legacy)) fs.unlinkSync(legacy)
+  }
+  meta.updatedAt = new Date().toISOString()
+  if (meta.errors?.leanProof) {
+    delete meta.errors.leanProof
     if (Object.keys(meta.errors).length === 0) delete meta.errors
   }
   writeMeta(dir, meta)
@@ -240,6 +262,7 @@ export function readSource(id: string): { bytes: Buffer; mime: string; filename:
 }
 
 function summarize(dir: string, meta: ProblemMeta): ProblemSummary {
+  migrateLeanLayout(dir)
   const files = buildFileViews(snapshots(dir, meta), meta.errors)
   return {
     id: meta.id,
@@ -294,9 +317,53 @@ function adoptLegacyProblems(): void {
   if (changed) writeRegistry(registry)
 }
 
+function migrateLeanLayout(dir: string): void {
+  const legacy = path.join(dir, 'lean')
+  if (!fs.existsSync(legacy)) return
+  moveLeanSource(dir, legacy, 'stub.lean', PROBLEM_ENV)
+  moveLeanSource(dir, legacy, 'proof.lean', SOLUTION_ENV)
+  removeLeanProject(legacy)
+  removeDirIfEmpty(legacy)
+}
+
+function moveLeanSource(dir: string, legacy: string, filename: string, envName: string): void {
+  const from = path.join(legacy, filename)
+  if (!fs.existsSync(from) || !fs.statSync(from).isFile()) return
+  const envDir = path.join(dir, envName)
+  fs.mkdirSync(envDir, { recursive: true })
+  copyLeanEnv(legacy, envDir)
+  const to = path.join(envDir, filename)
+  if (!fs.existsSync(to)) fs.renameSync(from, to)
+  else fs.unlinkSync(from)
+}
+
+function copyLeanEnv(from: string, to: string): void {
+  for (const name of ['lean-toolchain', 'lakefile.toml', 'lake-manifest.json']) {
+    const source = path.join(from, name)
+    const dest = path.join(to, name)
+    if (fs.existsSync(source) && fs.statSync(source).isFile() && !fs.existsSync(dest)) fs.copyFileSync(source, dest)
+  }
+  let target = ''
+  try {
+    target = fs.readlinkSync(path.join(from, '.lake', 'packages'))
+  } catch {
+    return
+  }
+  const destLink = path.join(to, '.lake', 'packages')
+  if (fs.existsSync(destLink)) return
+  fs.mkdirSync(path.dirname(destLink), { recursive: true })
+  fs.symlinkSync(target, destLink)
+}
+
+function removeDirIfEmpty(dir: string): void {
+  if (!fs.existsSync(dir)) return
+  if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
+}
+
 function storedPath(dir: string, key: FileKey, meta: ProblemMeta): string {
   if (key === 'source') return path.join(dir, meta.sourceFilename ?? 'source.png')
-  if (key === 'leanStub') return path.join(dir, LEAN_DIR, 'stub.lean')
+  if (key === 'leanStub') return path.join(dir, PROBLEM_ENV, 'stub.lean')
+  if (key === 'leanProof') return path.join(dir, SOLUTION_ENV, 'proof.lean')
   const entry = PROBLEM_FILES.find((item) => item.key === key)
   return path.join(dir, entry?.filename ?? key)
 }
