@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { leanHasError, type LeanCompileResult } from './formalize'
-import { findExecutable } from './toolchain'
+import { findExecutable, installedLeanRelease } from './toolchain'
 
 const ELAN = path.join(os.homedir(), '.elan', 'bin')
 const SEARCH = [ELAN, '/opt/homebrew/bin', '/usr/local/bin']
@@ -112,35 +112,9 @@ async function createProject(): Promise<LeanProject> {
 }
 
 function installedRelease(): { toolchain: string; version: string } {
-  const root = path.join(os.homedir(), '.elan', 'toolchains')
-  let names: string[] = []
-  try {
-    names = fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
-  } catch {
-    names = []
-  }
-  const found = names
-    .map(decodeToolchain)
-    .filter((item): item is { toolchain: string; version: string } => item != null)
-    .sort((a, b) => compareVersion(b.version, a.version))
-  if (!found[0]) throw new Error('Lean was not found. Install Lean and try again.')
-  return found[0]
-}
-
-function decodeToolchain(dirName: string): { toolchain: string; version: string } | null {
-  const toolchain = dirName.replace('---', ':').replace('--', '/')
-  const match = toolchain.match(/:v(\d+\.\d+\.\d+)$/)
-  if (!match) return null
-  return { toolchain, version: match[1] }
-}
-
-function compareVersion(left: string, right: string): number {
-  const a = left.split('.').map(Number)
-  const b = right.split('.').map(Number)
-  for (let index = 0; index < 3; index++) {
-    if (a[index] !== b[index]) return a[index] - b[index]
-  }
-  return 0
+  const found = installedLeanRelease()
+  if (!found) throw new Error('Lean was not found. Install Lean and try again.')
+  return found
 }
 
 function linkPackages(dir: string, target: string): void {

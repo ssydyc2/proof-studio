@@ -121,11 +121,19 @@ deleteProblem('problem-abc123')
 assert.equal(fs.existsSync(untitledDir), false)
 assert.equal((await import('../src/main/workspace')).listProblems().some((problem) => problem.id === 'problem-abc123'), false)
 
-const { findExecutable } = await import('../src/main/toolchain')
+const { findExecutable, installedLeanRelease, toolchainStatus } = await import('../src/main/toolchain')
 const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'proof-studio-bin-'))
 fs.writeFileSync(path.join(bin, 'pdflatex'), '')
 assert.equal(findExecutable('pdflatex', [bin]), path.join(bin, 'pdflatex'))
 assert.equal(findExecutable('not-a-proof-studio-tool', [bin]), null)
+const toolchainRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'proof-studio-toolchains-'))
+fs.mkdirSync(path.join(toolchainRoot, 'leanprover--lean4---v4.9.0'))
+fs.mkdirSync(path.join(toolchainRoot, 'leanprover--lean4---v4.31.0'))
+fs.writeFileSync(path.join(toolchainRoot, 'leanprover--lean4---v4.35.lock'), '1')
+assert.equal(installedLeanRelease(toolchainRoot)?.toolchain, 'leanprover/lean4:v4.31.0')
+const leanStatus = (await toolchainStatus()).find((tool) => tool.id === 'lean')
+assert.equal(leanStatus?.ready, true)
+assert.match(leanStatus?.detail ?? '', /Lean \(version \d+\.\d+\.\d+/)
 
 const { compilerFeedback, extractLean, formalizeSource, nextFormulation, summarizeLeanFailure } = await import(
   '../src/main/formalize'
