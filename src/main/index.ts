@@ -87,7 +87,7 @@ function registerIpc(): void {
     return listProblems()
   })
   ipcMain.handle('problems:compile', async (_event, id: string, sourceKey: TexSourceKey) => {
-    if (sourceKey !== 'problemText' && sourceKey !== 'readable') throw new Error('Unknown file.')
+    if (sourceKey !== 'problemText' && sourceKey !== 'solutionTex') throw new Error('Unknown file.')
     await compileTex(id, sourceKey)
     return listProblems()
   })

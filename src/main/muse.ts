@@ -1,6 +1,7 @@
 import path from 'node:path'
 import OpenAI from 'openai'
 import { formalizeSource } from './formalize'
+import { compileTex } from './latex'
 import { compileLeanSource, installLeanProject, prepareLean, removeLeanProject } from './lean'
 import { proveSource } from './prove'
 import { FORMALIZE_ATTEMPTS, type FormalizeProgress } from '../shared/formalize'
@@ -47,7 +48,9 @@ export async function transcribeProblem(id: string): Promise<ProblemSummary> {
     const text = await transcribeImage(apiKey, source.bytes, source.mime)
     const tex = ensureLatexDocument(text)
     if (!tex) failTranscription(id, 'The transcription was empty.')
-    return writeProblemText(id, tex)
+    const summary = writeProblemText(id, tex)
+    await compileTex(id, 'problemText')
+    return summary
   } catch (error) {
     if (isEmptyTranscription(error)) throw error
     failTranscription(id, explainMuseError(error, apiKey))

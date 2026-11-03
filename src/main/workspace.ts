@@ -94,6 +94,10 @@ const OWNED_FILES = [
   'proof.lean',
   'readable.tex',
   'readable.pdf',
+  'writeup.tex',
+  'writeup.pdf',
+  'solution.tex',
+  'solution.pdf',
   'source.png',
   'source.jpg',
   'source.jpeg',
@@ -157,7 +161,7 @@ export function readFile(id: string, key: FileKey): FileContent {
       dataUrl: `data:${mime};base64,${bytes.toString('base64')}`
     }
   }
-  if (key === 'problemPdf' || key === 'readablePdf') {
+  if (key === 'problemPdf' || key === 'solutionPdf') {
     const bytes = fs.readFileSync(storedPath(dir, key, meta))
     return {
       kind: 'pdf',
@@ -263,6 +267,7 @@ export function readSource(id: string): { bytes: Buffer; mime: string; filename:
 
 function summarize(dir: string, meta: ProblemMeta): ProblemSummary {
   migrateLeanLayout(dir)
+  migrateSolutionNames(dir)
   const files = buildFileViews(snapshots(dir, meta), meta.errors)
   return {
     id: meta.id,
@@ -315,6 +320,35 @@ function adoptLegacyProblems(): void {
     changed = true
   }
   if (changed) writeRegistry(registry)
+}
+
+function migrateSolutionNames(dir: string): void {
+  for (const from of ['readable.tex', 'writeup.tex']) moveFile(dir, from, 'solution.tex')
+  for (const from of ['readable.pdf', 'writeup.pdf']) moveFile(dir, from, 'solution.pdf')
+  const meta = readMeta(dir)
+  if (!meta?.errors) return
+  const errors = meta.errors as Record<string, string>
+  let changed = false
+  for (const [from, to] of [
+    ['readable', 'solutionTex'],
+    ['writeup', 'solutionTex'],
+    ['readablePdf', 'solutionPdf'],
+    ['writeupPdf', 'solutionPdf']
+  ] as const) {
+    if (!errors[from]) continue
+    if (!errors[to]) errors[to] = errors[from]
+    delete errors[from]
+    changed = true
+  }
+  if (changed) writeMeta(dir, { ...meta, errors: errors as ProblemMeta['errors'] })
+}
+
+function moveFile(dir: string, fromName: string, toName: string): void {
+  const from = path.join(dir, fromName)
+  const to = path.join(dir, toName)
+  if (!fs.existsSync(from) || !fs.statSync(from).isFile()) return
+  if (!fs.existsSync(to)) fs.renameSync(from, to)
+  else fs.unlinkSync(from)
 }
 
 function migrateLeanLayout(dir: string): void {
