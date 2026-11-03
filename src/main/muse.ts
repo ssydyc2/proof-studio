@@ -4,7 +4,7 @@ import { formalizeSource } from './formalize'
 import { compileLeanSource, installLeanProject, prepareLean, removeLeanProject } from './lean'
 import { proveSource } from './prove'
 import { FORMALIZE_ATTEMPTS, type FormalizeProgress } from '../shared/formalize'
-import { PROOF_ATTEMPTS, type ProveProgress } from '../shared/prove'
+import { proofAttemptCount, type ProveProgress } from '../shared/prove'
 import { ensureLatexDocument, LEAN_DIR, type ProblemSummary } from '../shared/problem'
 import {
   problemDirectory,
@@ -117,29 +117,32 @@ export async function formalizeProblem(
 
 export async function proveProblem(
   id: string,
+  attempts: number,
   onProgress?: (progress: ProveProgress) => void
 ): Promise<ProblemSummary> {
   if (!hasApiKey() || !apiKey) throw new Error('Enter an API key first.')
   const stub = readFile(id, 'leanStub')
   if (stub.kind !== 'text' || !stub.text.trim()) throw new Error('No Lean stub yet.')
+  const count = proofAttemptCount(attempts)
   const key = apiKey
   try {
     const rounds: ProveProgress['rounds'] = []
     const publish = (progress: ProveProgress) => onProgress?.(progress)
-    publish({ phase: 'setup', statement: 1, attempt: 0, total: PROOF_ATTEMPTS, rounds })
+    publish({ phase: 'setup', statement: 1, attempt: 0, total: count, rounds })
     const project = await prepareLean()
     const source = await proveSource({
       stub: stub.text,
       toolchain: project.toolchain,
+      attempts: count,
       onAttempt: (statement, attempt) =>
-        publish({ phase: 'attempt', statement, attempt, total: PROOF_ATTEMPTS, rounds: [...rounds] }),
+        publish({ phase: 'attempt', statement, attempt, total: count, rounds: [...rounds] }),
       onRound: (round) => {
         rounds.push(round)
         publish({
           phase: 'round',
           statement: round.statement,
           attempt: round.attempt,
-          total: PROOF_ATTEMPTS,
+          total: count,
           rounds: [...rounds]
         })
       },

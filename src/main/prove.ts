@@ -1,14 +1,16 @@
-import { PROOF_ATTEMPTS, PROOF_STATEMENTS, type ProveRound } from '../shared/prove'
+import { PROOF_ATTEMPTS, PROOF_STATEMENTS, proofAttemptCount, type ProveRound } from '../shared/prove'
 import { compilerFeedback, extractLean, summarizeLeanFailure, type LeanCompileResult } from './formalize'
 
 export async function proveSource(options: {
   stub: string
   toolchain: string
+  attempts?: number
   ask: (prompt: string) => Promise<string>
   compile: (source: string) => Promise<LeanCompileResult>
   onAttempt?: (statement: number, attempt: number) => void
   onRound?: (round: ProveRound) => void
 }): Promise<string> {
+  const attempts = proofAttemptCount(options.attempts ?? PROOF_ATTEMPTS)
   const statements = statementsOf(options.stub)
   if (statements.length === 0) throw new Error('The Lean stub has no statement to prove.')
   let lastOutput = 'lean failed.'
@@ -17,7 +19,7 @@ export async function proveSource(options: {
     const statement = statements[index]
     const number = index + 1
     let previous: { source: string; output: string } | null = null
-    for (let attempt = 1; attempt <= PROOF_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
       options.onAttempt?.(number, attempt)
       const raw = await options.ask(provePrompt(options.toolchain, statement, previous))
       const source = extractLean(raw)
@@ -44,9 +46,10 @@ export async function proveSource(options: {
       }
       lastOutput = result.output
       previous = { source, output: result.output }
-      report(false, summarizeLeanFailure(result.output))
+      report(false, compilerFeedback(result.output))
     }
-    failures.push(`${statement.name} failed after ${PROOF_ATTEMPTS} attempts`)
+    const attemptWord = attempts === 1 ? 'attempt' : 'attempts'
+    failures.push(`${statement.name} failed after ${attempts} ${attemptWord}`)
   }
   throw new Error(`Lean did not accept a proof. ${failures.join('. ')}. ${summarizeLeanFailure(lastOutput)}`)
 }

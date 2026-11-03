@@ -369,4 +369,31 @@ await assert.rejects(
 )
 assert.equal(bothAsks, 6)
 
+let oneAsk = 0
+await assert.rejects(
+  proveSource({
+    stub: split[0].file,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    attempts: 1,
+    ask: async () => {
+      oneAsk += 1
+      return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
+    },
+    compile: async () => ({ ok: false, output: 'stub.lean:3:2: error: type mismatch\n  exact True' })
+  }),
+  /statement1 failed after 1 attempt/
+)
+assert.equal(oneAsk, 1)
+
+await assert.rejects(
+  proveSource({
+    stub: split[0].file,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    attempts: 0,
+    ask: async () => split[0].file,
+    compile: async () => ({ ok: true })
+  }),
+  /from 1 to 10/
+)
+
 console.log(`workspace check passed in ${root}`)

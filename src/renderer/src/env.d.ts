@@ -15,7 +15,7 @@ export interface ProofStudioApi {
   transcribe: (id: string) => Promise<ProblemSummary[]>
   formalize: (id: string) => Promise<ProblemSummary[]>
   onFormalizeProgress: (listener: (progress: FormalizeProgress) => void) => () => void
-  prove: (id: string) => Promise<ProblemSummary[]>
+  prove: (id: string, attempts: number) => Promise<ProblemSummary[]>
   onProveProgress: (listener: (progress: ProveProgress) => void) => () => void
   compilePdf: (id: string, sourceKey: TexSourceKey) => Promise<ProblemSummary[]>
   toolchainStatus: () => Promise<ToolStatus[]>

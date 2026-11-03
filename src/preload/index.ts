@@ -25,7 +25,8 @@ const api = {
       ipcRenderer.removeListener('formalize:progress', wrapped)
     }
   },
-  prove: (id: string): Promise<ProblemSummary[]> => ipcRenderer.invoke('problems:prove', id),
+  prove: (id: string, attempts: number): Promise<ProblemSummary[]> =>
+    ipcRenderer.invoke('problems:prove', id, attempts),
   onProveProgress: (listener: (progress: ProveProgress) => void): (() => void) => {
     const wrapped = (_event: Electron.IpcRendererEvent, progress: ProveProgress) => listener(progress)
     ipcRenderer.on('prove:progress', wrapped)

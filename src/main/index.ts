@@ -80,8 +80,8 @@ function registerIpc(): void {
     })
     return listProblems()
   })
-  ipcMain.handle('problems:prove', async (event, id: string) => {
-    await proveProblem(id, (progress) => {
+  ipcMain.handle('problems:prove', async (event, id: string, attempts: number) => {
+    await proveProblem(id, attempts, (progress) => {
       event.sender.send('prove:progress', progress)
     })
     return listProblems()

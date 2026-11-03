@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormalizeProgress, FormalizeRound } from '../../shared/formalize'
-import type { ProveProgress, ProveRound } from '../../shared/prove'
+import { PROOF_ATTEMPTS, PROOF_ATTEMPT_MAX, proofAttemptCount, type ProveProgress, type ProveRound } from '../../shared/prove'
 import {
   fileByKey,
   pdfKeyFor,
@@ -46,6 +46,7 @@ export function App() {
   const [formalizeRounds, setFormalizeRounds] = useState<FormalizeRound[]>([])
   const [proveProgress, setProveProgress] = useState<ProveProgress | null>(null)
   const [proveRounds, setProveRounds] = useState<ProveRound[]>([])
+  const [attempts, setAttempts] = useState(String(PROOF_ATTEMPTS))
   const [error, setError] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<ProblemSummary | null>(null)
   const [keyOpen, setKeyOpen] = useState(false)
@@ -236,6 +237,13 @@ export function App() {
   }
 
   async function prove(id: string) {
+    let count: number
+    try {
+      count = proofAttemptCount(attempts)
+    } catch (cause) {
+      setError(messageOf(cause))
+      return
+    }
     setBusy('prove')
     setProveProgress(null)
     setProveRounds([])
@@ -243,7 +251,7 @@ export function App() {
     setFormalizeRounds([])
     setError(null)
     try {
-      const nextProblems = await window.proofStudio.prove(id)
+      const nextProblems = await window.proofStudio.prove(id, count)
       setProblems(nextProblems)
       setSelectedFile('leanProof')
       setLoadTick((tick) => tick + 1)
@@ -468,17 +476,34 @@ export function App() {
               </div>
             )}
           </div>
-          {action && (
-            <button
-              className="next"
-              type="button"
-              disabled={!action.enabled}
-              title={pair?.action === 'unavailable' ? 'Not available in this version.' : undefined}
-              onClick={() => void runAction()}
-            >
-              <Icon name={actionIcon(pair, selected)} size={15} />
-              {action.label}
-            </button>
+          {(action || pair?.action === 'generate-proof') && (
+          <div className="top-actions">
+            {pair?.action === 'generate-proof' && (
+              <label className="attempt-field">
+                Attempts
+                <input
+                  type="number"
+                  min={1}
+                  max={PROOF_ATTEMPT_MAX}
+                  value={attempts}
+                  disabled={busy === 'prove'}
+                  onChange={(event) => setAttempts(event.target.value)}
+                />
+              </label>
+            )}
+            {action && (
+              <button
+                className="next"
+                type="button"
+                disabled={!action.enabled}
+                title={pair?.action === 'unavailable' ? 'Not available in this version.' : undefined}
+                onClick={() => void runAction()}
+              >
+                <Icon name={actionIcon(pair, selected)} size={15} />
+                {action.label}
+              </button>
+            )}
+          </div>
           )}
           {!selected && (
             <button className="next" type="button" onClick={() => void openFolder()}>
@@ -488,44 +513,38 @@ export function App() {
           )}
         </header>
         {(formalizeProgress || formalizeRounds.length > 0) && (
-          <div className="status-bar" aria-live="polite">
-            {formalizeProgress?.phase === 'setup' && <p className="status-wait">Preparing Lean…</p>}
-            {formalizeProgress?.phase === 'attempt' && formalizeRounds.length < formalizeProgress.attempt && (
-              <p className="status-wait">Waiting for statement {formalizeProgress.statement}…</p>
-            )}
-            {formalizeRounds.map((round) => (
-              <p key={round.attempt} className="status-round">
-                <span className="status-index">{round.attempt}</span>
-                <span className="status-state" data-ok={round.ok}>
-                  {round.ok ? 'Compiled' : 'Failed'}
-                </span>
-                <code title={round.returned}>{round.returned}</code>
-                <span className="status-detail">{round.detail}</span>
-              </p>
-            ))}
-          </div>
+          <StatusLog
+            waiting={
+              formalizeProgress?.phase === 'setup'
+                ? 'Preparing Lean…'
+                : formalizeProgress?.phase === 'attempt' && formalizeRounds.length < formalizeProgress.attempt
+                  ? `Waiting for statement ${formalizeProgress.statement}…`
+                  : null
+            }
+            rounds={formalizeRounds.map((round) => ({
+              key: String(round.attempt),
+              index: String(round.attempt),
+              ok: round.ok,
+              detail: round.detail
+            }))}
+          />
         )}
         {(proveProgress || proveRounds.length > 0) && (
-          <div className="status-bar" aria-live="polite">
-            {proveProgress?.phase === 'setup' && <p className="status-wait">Preparing Lean…</p>}
-            {proveProgress?.phase === 'attempt' && (
-              <p className="status-wait">
-                Proving statement {proveProgress.statement}, attempt {proveProgress.attempt} of {proveProgress.total}…
-              </p>
-            )}
-            {proveRounds.map((round) => (
-              <p key={`${round.statement}-${round.attempt}`} className="status-round">
-                <span className="status-index">
-                  {round.statement}.{round.attempt}
-                </span>
-                <span className="status-state" data-ok={round.ok}>
-                  {round.ok ? 'Compiled' : 'Failed'}
-                </span>
-                <code title={round.returned}>{round.returned}</code>
-                <span className="status-detail">{round.detail}</span>
-              </p>
-            ))}
-          </div>
+          <StatusLog
+            waiting={
+              proveProgress?.phase === 'setup'
+                ? 'Preparing Lean…'
+                : proveProgress?.phase === 'attempt'
+                  ? `Proving statement ${proveProgress.statement}, attempt ${proveProgress.attempt} of ${proveProgress.total}…`
+                  : null
+            }
+            rounds={proveRounds.map((round) => ({
+              key: `${round.statement}-${round.attempt}`,
+              index: `${round.statement}.${round.attempt}`,
+              ok: round.ok,
+              detail: round.detail
+            }))}
+          />
         )}
         {error && (
           <p className="banner" role="alert">
@@ -730,6 +749,33 @@ function actionIcon(pair: FilePair | null, problem: ProblemSummary | null): keyo
   return !source || source.state === 'empty' || source.state === 'failed' ? 'upload' : 'sparkle'
 }
 
+function StatusLog(props: {
+  waiting: string | null
+  rounds: { key: string; index: string; ok: boolean; detail: string }[]
+}) {
+  const log = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const node = log.current
+    if (node) node.scrollTop = node.scrollHeight
+  }, [props.waiting, props.rounds])
+  return (
+    <div className="status-bar" aria-live="polite" ref={log}>
+      {props.waiting && <p className="status-wait">{props.waiting}</p>}
+      {props.rounds.map((round) => (
+        <article key={round.key} className="status-round">
+          <div className="status-meta">
+            <span className="status-index">{round.index}</span>
+            <span className="status-state" data-ok={round.ok}>
+              {round.ok ? 'Compiled' : 'Failed'}
+            </span>
+          </div>
+          {round.detail && <pre className="status-detail">{round.detail}</pre>}
+        </article>
+      ))}
+    </div>
+  )
+}
+
 function pairFor(key: FileKey, files: ProblemFileView[]): FilePair {
   const tex = fileByKey(files, 'problemText')
   const texReady = Boolean(tex && tex.state !== 'empty' && tex.state !== 'failed')
@@ -854,7 +900,7 @@ function emptyCopy(key: FileKey): string {
     case 'leanStub':
       return 'stub.lean is created from problem.tex and saved in the lean folder. Muse writes two Lean statements of the problem. Each proof is sorry, and Lake checks the file against Mathlib.'
     case 'leanProof':
-      return 'proof.lean is written into the lean folder. Muse proves one statement from stub.lean. Each statement gets three attempts. If the first compiles, the second is left alone.'
+      return 'proof.lean is written into the lean folder. Muse proves one statement from stub.lean. Set how many attempts each statement gets. If the first compiles, the second is left alone.'
     case 'readable':
       return 'Generate readable proof is not available in this version.'
     case 'readablePdf':

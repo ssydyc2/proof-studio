@@ -440,8 +440,42 @@ svg {
   -webkit-app-region: drag;
 }
 
-.topbar button {
+.topbar button,
+.topbar .top-actions {
   -webkit-app-region: no-drag;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.attempt-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.attempt-field input {
+  width: 64px;
+  height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  outline: none;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  text-align: center;
+}
+
+.attempt-field input:focus {
+  box-shadow:
+    inset 0 0 0 1px var(--blue),
+    0 0 0 3px var(--blue-ring);
 }
 
 .eyebrow {
@@ -548,10 +582,14 @@ button:disabled:hover {
 
 .status-bar {
   display: flex;
+  flex: 1 1 280px;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+  min-height: 220px;
+  max-height: 46vh;
   margin: 0;
-  padding: 8px 10px;
+  padding: 12px 14px;
+  overflow: auto;
   border-radius: 9px;
   background: var(--canvas);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -568,10 +606,15 @@ button:disabled:hover {
 }
 
 .status-round {
-  display: grid;
-  grid-template-columns: 28px 64px minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.status-meta {
+  display: flex;
   align-items: baseline;
+  gap: 8px;
 }
 
 .status-index {
@@ -587,21 +630,20 @@ button:disabled:hover {
   color: var(--red);
 }
 
-.status-round code,
 .status-detail {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.status-round code {
-  font-family: var(--mono);
-  font-size: 11px;
+  margin: 0;
+  max-height: 240px;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink-2);
-}
-
-.status-detail {
-  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .banner {
