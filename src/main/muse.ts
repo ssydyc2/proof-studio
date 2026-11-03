@@ -6,6 +6,7 @@ import { compileTex } from './latex'
 import { compileLeanSource, installLeanProject, prepareLean, removeLeanProject } from './lean'
 import { proveSource } from './prove'
 import { EXPLAIN_ATTEMPTS, type ExplainProgress } from '../shared/explain'
+import { leanLines, parseLeanRanges, type LeanRange } from '../shared/locate'
 import { FORMALIZE_ATTEMPTS, type FormalizeProgress } from '../shared/formalize'
 import { proofAttemptCount, type ProveProgress } from '../shared/prove'
 import { ensureLatexDocument, PROBLEM_ENV, SOLUTION_ENV, type ProblemSummary } from '../shared/problem'
@@ -208,15 +209,64 @@ export async function explainProblem(
   }
 }
 
-async function askMuse(key: string, prompt: string): Promise<string> {
+export async function locateLean(id: string, passage: string): Promise<LeanRange[]> {
+  if (!hasApiKey() || !apiKey) throw new Error('Enter an API key first.')
+  const proof = readFile(id, 'leanProof')
+  if (proof.kind !== 'text' || !proof.text.trim()) throw new Error('No Lean proof yet.')
+  const text = passage.replace(/\u00a0/g, ' ').trim()
+  if (!text) throw new Error('Select some text in the PDF first.')
+  if (text.length > 4000) throw new Error('Select a shorter passage.')
+  const lines = leanLines(proof.text)
+  const numbered = lines.map((line, index) => `${index + 1}|${line}`).join('\n')
+  let reply: string
+  try {
+    reply = await askMuse(apiKey, locatePrompt(text, numbered), 'medium', 90_000)
+  } catch (error) {
+    throw new Error(explainMuseError(error, apiKey))
+  }
+  const ranges = parseLeanRanges(reply, lines.length)
+  if (ranges.length === 0) throw new Error('No Lean lines matched that selection.')
+  return ranges
+}
+
+function locatePrompt(passage: string, numbered: string): string {
+  const lean = numbered.length > 20_000 ? `${numbered.slice(0, 20_000)}\n…` : numbered
+  return `The user selected this passage from a typeset proof. It was copied from a PDF, so spacing and line breaks may be messy.
+
+Passage:
+"""
+${passage}
+"""
+
+Lean proof. Each line starts with its line number and a bar.
+
+${lean}
+
+Which lines of this Lean proof does the passage come from?
+Reply with JSON only, no markdown:
+{"ranges":[{"start":12,"end":18}]}
+
+Rules:
+- Line numbers are 1-based and inclusive.
+- Return every Lean line the passage comes from.
+- Use separate ranges when the lines are not contiguous.
+- If nothing matches, return {"ranges":[]}.`
+}
+
+async function askMuse(
+  key: string,
+  prompt: string,
+  effort: 'low' | 'medium' | 'high' | 'xhigh' = 'xhigh',
+  timeout = 300_000
+): Promise<string> {
   const client = new OpenAI({
     apiKey: key,
     baseURL: BASE_URL,
-    timeout: 300_000
+    timeout
   })
   const response = await client.responses.create({
     model: MODEL,
-    reasoning: { effort: 'xhigh' },
+    reasoning: { effort },
     input: [
       {
         role: 'user',

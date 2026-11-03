@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { ExplainProgress } from '../shared/explain'
 import type { FormalizeProgress } from '../shared/formalize'
 import type { ProveProgress } from '../shared/prove'
+import type { LeanRange } from '../shared/locate'
 import type { FileContent, FileKey, ProblemSummary, TexSourceKey } from '../shared/problem'
 import type { ToolId, ToolStatus } from '../shared/toolchain'
 
@@ -45,6 +46,8 @@ const api = {
   },
   compilePdf: (id: string, sourceKey: TexSourceKey): Promise<ProblemSummary[]> =>
     ipcRenderer.invoke('problems:compile', id, sourceKey),
+  locateLean: (id: string, passage: string): Promise<LeanRange[]> =>
+    ipcRenderer.invoke('problems:locate-lean', id, passage),
   toolchainStatus: (): Promise<ToolStatus[]> => ipcRenderer.invoke('environment:status'),
   openInstall: (id: ToolId): Promise<void> => ipcRenderer.invoke('environment:open', id)
 }

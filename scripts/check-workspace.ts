@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { parseLeanRanges } from '../src/shared/locate'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -10,6 +11,14 @@ process.env.PROOF_STUDIO_LEGACY = path.join(root, 'legacy')
 fs.mkdirSync(process.env.PROOF_STUDIO_LEGACY)
 const folder = path.join(root, 'Infinitely many primes')
 fs.mkdirSync(folder)
+
+assert.deepEqual(parseLeanRanges('{"ranges":[{"start":2,"end":4},{"start":3,"end":6}]}', 8), [
+  { start: 2, end: 6 }
+])
+assert.deepEqual(parseLeanRanges('```json\n{"start":1,"end":2}\n```', 5), [{ start: 1, end: 2 }])
+assert.deepEqual(parseLeanRanges('{"ranges":[{"start":0,"end":2},{"start":9,"end":10},{"start":4,"end":3}]}', 4), [])
+assert.deepEqual(parseLeanRanges('{"ranges":[]}', 3), [])
+assert.throws(() => parseLeanRanges('no line numbers', 3), /line numbers/)
 
 const fixture = fileURLToPath(new URL('../fixtures/infinitely-many-primes.png', import.meta.url))
 const image = fs.readFileSync(fixture)
