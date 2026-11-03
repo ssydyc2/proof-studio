@@ -60,6 +60,12 @@ assert.equal(pdf?.state, 'current')
 const pdfBytes = fs.readFileSync(path.join(folder, 'problem.pdf'))
 assert.equal(pdfBytes.subarray(0, 5).toString(), '%PDF-')
 
+const { writeSolutionText } = await import('../src/main/workspace')
+writeSolutionText(written.id, ensureLatexDocument('There are infinitely many primes.'))
+await compileTex(written.id, 'solutionTex')
+const solutionPdfBytes = fs.readFileSync(path.join(folder, 'solution.pdf'))
+assert.equal(solutionPdfBytes.subarray(0, 5).toString(), '%PDF-')
+
 const { writeLeanStub } = await import('../src/main/workspace')
 const stubSource = `import Mathlib.Data.Nat.Prime.Defs
 
@@ -297,6 +303,41 @@ await assert.rejects(
 )
 assert.equal(failureAsks, 2)
 assert.equal(failures, 2)
+
+const { explainSource } = await import('../src/main/explain')
+const solutionDoc = '\\documentclass{article}\n\\begin{document}\nA proof.\n\\end{document}'
+let explainAsks = 0
+const explainPrompts: string[] = []
+const explained = await explainSource({
+  lean: 'theorem statement1 : Nat.Prime 2 := by decide',
+  problem: 'Prove that 2 is prime.',
+  ask: async (prompt) => {
+    explainPrompts.push(prompt)
+    explainAsks += 1
+    if (explainAsks < 3) return 'not latex'
+    return `\`\`\`latex\n${solutionDoc}\n\`\`\``
+  },
+  compile: async (tex) => {
+    if (tex.includes('not latex')) return { ok: false, message: 'Emergency stop.' }
+    return { ok: true }
+  }
+})
+assert.equal(explainAsks, 3)
+assert.match(explained, /A proof/)
+assert.match(explainPrompts[0], /Lean proof/)
+assert.match(explainPrompts[0], /Prove that 2 is prime/)
+assert.match(explainPrompts[2], /did not compile/)
+assert.match(explainPrompts[2], /Emergency stop/)
+
+await assert.rejects(
+  explainSource({
+    lean: 'theorem statement1 : True := by trivial',
+    problem: '',
+    ask: async () => solutionDoc,
+    compile: async () => ({ ok: false, message: 'Undefined control sequence.' })
+  }),
+  /after 3 attempts/
+)
 
 const { proofError, proveSource, statementsOf } = await import('../src/main/prove')
 const two = `import Mathlib.Data.Nat.Prime.Defs

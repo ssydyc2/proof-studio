@@ -1,9 +1,11 @@
 import path from 'node:path'
 import OpenAI from 'openai'
+import { explainSource } from './explain'
 import { formalizeSource } from './formalize'
 import { compileTex } from './latex'
 import { compileLeanSource, installLeanProject, prepareLean, removeLeanProject } from './lean'
 import { proveSource } from './prove'
+import { EXPLAIN_ATTEMPTS, type ExplainProgress } from '../shared/explain'
 import { FORMALIZE_ATTEMPTS, type FormalizeProgress } from '../shared/formalize'
 import { proofAttemptCount, type ProveProgress } from '../shared/prove'
 import { ensureLatexDocument, PROBLEM_ENV, SOLUTION_ENV, type ProblemSummary } from '../shared/problem'
@@ -14,7 +16,8 @@ import {
   recordProblemError,
   writeLeanProof,
   writeLeanStub,
-  writeProblemText
+  writeProblemText,
+  writeSolutionText
 } from './workspace'
 
 const MODEL = 'muse-wonder-1.0'
@@ -165,6 +168,46 @@ export async function proveProblem(
   }
 }
 
+export async function explainProblem(
+  id: string,
+  onProgress?: (progress: ExplainProgress) => void
+): Promise<ProblemSummary> {
+  if (!hasApiKey() || !apiKey) throw new Error('Enter an API key first.')
+  const proof = readFile(id, 'leanProof')
+  if (proof.kind !== 'text' || !proof.text.trim()) throw new Error('No Lean proof yet.')
+  const problem = readFile(id, 'problemText')
+  const key = apiKey
+  try {
+    const rounds: ExplainProgress['rounds'] = []
+    const publish = (progress: ExplainProgress) => onProgress?.(progress)
+    let summary: ProblemSummary | null = null
+    await explainSource({
+      lean: proof.text,
+      problem: problem.kind === 'text' ? problem.text : '',
+      onAttempt: (attempt) => publish({ phase: 'attempt', attempt, total: EXPLAIN_ATTEMPTS, rounds: [...rounds] }),
+      onRound: (round) => {
+        rounds.push(round)
+        publish({ phase: 'round', attempt: round.attempt, total: EXPLAIN_ATTEMPTS, rounds: [...rounds] })
+      },
+      ask: (prompt) => askMuse(key, prompt),
+      compile: async (tex) => {
+        summary = writeSolutionText(id, tex)
+        try {
+          await compileTex(id, 'solutionTex')
+          return { ok: true }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'pdflatex failed.'
+          return { ok: false, message }
+        }
+      }
+    })
+    if (!summary) throw new Error('The solution TeX was empty.')
+    return summary
+  } catch (error) {
+    failStep(id, 'solutionTex', explainMuseError(error, key))
+  }
+}
+
 async function askMuse(key: string, prompt: string): Promise<string> {
   const client = new OpenAI({
     apiKey: key,
@@ -204,7 +247,7 @@ function failTranscription(id: string, message: string): never {
   failStep(id, 'problemText', message)
 }
 
-function failStep(id: string, key: 'problemText' | 'leanStub' | 'leanProof', message: string): never {
+function failStep(id: string, key: 'problemText' | 'leanStub' | 'leanProof' | 'solutionTex', message: string): never {
   if (readFile(id, key).kind !== 'text') recordProblemError(id, key, message)
   throw new Error(message)
 }
