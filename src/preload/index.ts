@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { FormalizeProgress } from '../shared/formalize'
 import type { FileContent, FileKey, ProblemSummary, TexSourceKey } from '../shared/problem'
 import type { ToolId, ToolStatus } from '../shared/toolchain'
 
@@ -15,6 +16,14 @@ const api = {
   hasApiKey: (): Promise<boolean> => ipcRenderer.invoke('api-key:has'),
   setApiKey: (key: string): Promise<void> => ipcRenderer.invoke('api-key:set', key),
   transcribe: (id: string): Promise<ProblemSummary[]> => ipcRenderer.invoke('problems:transcribe', id),
+  formalize: (id: string): Promise<ProblemSummary[]> => ipcRenderer.invoke('problems:formalize', id),
+  onFormalizeProgress: (listener: (progress: FormalizeProgress) => void): (() => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, progress: FormalizeProgress) => listener(progress)
+    ipcRenderer.on('formalize:progress', wrapped)
+    return () => {
+      ipcRenderer.removeListener('formalize:progress', wrapped)
+    }
+  },
   compilePdf: (id: string, sourceKey: TexSourceKey): Promise<ProblemSummary[]> =>
     ipcRenderer.invoke('problems:compile', id, sourceKey),
   toolchainStatus: (): Promise<ToolStatus[]> => ipcRenderer.invoke('environment:status'),

@@ -1,3 +1,5 @@
+export const LEAN_DIR = 'lean'
+
 export const PROBLEM_FILES = [
   { key: 'source', filename: 'source.png', label: 'Screenshot' },
   { key: 'problemText', filename: 'problem.tex', label: 'Problem text' },
@@ -75,7 +77,7 @@ export const STEP_LABEL: Record<NextStep, string> = {
 }
 
 export function stepEnabled(step: NextStep | null): boolean {
-  return step === 'add-screenshot' || step === 'transcribe'
+  return step === 'add-screenshot' || step === 'transcribe' || step === 'formalize'
 }
 
 export function fileState(
