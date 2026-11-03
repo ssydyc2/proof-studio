@@ -2,3 +2,8 @@ node_modules
 out
 dist
 .DS_Store
+meta_key
+glm_key
+eval/dataset/*/problem.tex
+eval/dataset/*/problem.pdf
+eval/results/

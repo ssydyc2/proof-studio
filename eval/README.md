@@ -1,14 +1,27 @@
-# Eval set
+# Eval
 
-`dataset/` holds 50 exercises from the [ProofNet informal benchmark](https://github.com/zhangir-azerbayev/ProofNet/tree/main/benchmark/benchmark_to_publish/informal). They are contest problems and textbook exercises, not named theorems.
+Everything for evaluation lives in this folder.
 
-Sources: Putnam, Cambridge Tripos, Ireland–Rosen, Artin, Axler, Dummit–Foote, Herstein, Munkres, Pugh, Rudin, and Stein–Shakarchi. Fields include number theory, algebra, analysis, and topology.
+- `dataset/` holds 50 exercises from the [ProofNet informal benchmark](https://github.com/zhangir-azerbayev/ProofNet/tree/main/benchmark/benchmark_to_publish/informal). Each problem folder has `source.png` and `meta.json`. `render_dataset.py` rebuilds the screenshots.
+- `meta_key` is the Meta API key used for transcription. `glm_key` is the GLM API key used for comparison. Neither is committed.
+- One script per step, run from the repo root. A folder name limits the run to one problem.
+- Screenshot transcription stays in the app, because generating TeX uses it. `glm.ts` calls GLM for the comparison only.
+- `results/` holds each step's output and is not committed. Generated `problem.tex` and `problem.pdf` stay in the problem folder and are not committed.
 
-Each folder contains:
+## Transcribe
 
-- `source.png`, a screenshot of the problem statement only
-- `meta.json`, the field, the book, the exercise number, and the ProofNet source file
+`npm run eval:transcribe` turns every `source.png` into `problem.tex` and `problem.pdf`, using the app's transcription and compile path. The outcome is `results/transcribe.json`.
 
-The screenshot does not include the proof. `dataset/manifest.json` lists every problem.
+```
+npm run eval:transcribe -- 01-putnam-2020-b5
+```
 
-`render_dataset.py` rebuilds the screenshots from the statements in that file.
+## Compare
+
+`npm run eval:compare` asks GLM (`glm-5.3-flash`) whether `source.png` and `problem.pdf` state the same problem. It reads `eval/glm_key`. The outcome is `results/compare.json`.
+
+```
+npm run eval:compare -- 01-putnam-2020-b5
+```
+
+All 50 screenshots transcribed and compiled. GLM judged 49 of 50 as the same problem. It marked Herstein 2.2.5 inconsistent, reading \((ab)^5 = a^5 b^5\) as \((ab)^6 = a^5 b^5\). The screenshot and `problem.tex` both have exponent 5, so that mark is a false positive.

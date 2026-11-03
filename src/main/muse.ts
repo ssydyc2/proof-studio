@@ -48,17 +48,25 @@ export function setApiKey(key: string): void {
 export async function transcribeProblem(id: string): Promise<ProblemSummary> {
   if (!hasApiKey() || !apiKey) throw new Error('Enter an API key first.')
   const source = readSource(id)
+  const key = apiKey
   try {
-    const text = await transcribeImage(apiKey, source.bytes, source.mime)
-    const tex = ensureLatexDocument(text)
-    if (!tex) failTranscription(id, 'The transcription was empty.')
+    const tex = await transcribeScreenshot(key, source.bytes, source.mime)
     const summary = writeProblemText(id, tex)
     await compileTex(id, 'problemText')
     return summary
   } catch (error) {
     if (isEmptyTranscription(error)) throw error
-    failTranscription(id, explainMuseError(error, apiKey))
+    failTranscription(id, explainMuseError(error, key))
   }
+}
+
+export async function transcribeScreenshot(key: string, bytes: Buffer, mime: string): Promise<string> {
+  const trimmed = key.trim()
+  if (!trimmed) throw new Error('Enter an API key.')
+  const text = await transcribeImage(trimmed, bytes, mime)
+  const tex = ensureLatexDocument(text)
+  if (!tex) throw new Error('The transcription was empty.')
+  return tex
 }
 
 async function transcribeImage(key: string, bytes: Buffer, mime: string): Promise<string> {

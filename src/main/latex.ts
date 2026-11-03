@@ -32,17 +32,25 @@ async function compileTexOnce(id: string, sourceKey: TexSourceKey): Promise<void
     throw new Error(sourceKey === 'problemText' ? 'No problem text yet.' : 'No solution TeX yet.')
   }
 
+  try {
+    await compileTexFile(dir, texName)
+    clearStepError(id, pdfKey)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'pdflatex failed.'
+    if (readFile(id, pdfKey).kind !== 'pdf') recordProblemError(id, pdfKey, message)
+    throw error instanceof Error ? error : new Error(message)
+  }
+}
+
+export async function compileTexFile(dir: string, texName: string): Promise<void> {
+  const texPath = path.join(dir, texName)
+  if (!fs.existsSync(texPath)) throw new Error(`No TeX file at ${texName}.`)
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'proof-studio-'))
   try {
     const { code, output } = await runPdflatex(texName, dir, tmp)
     const produced = path.join(tmp, texName.replace(/\.tex$/, '.pdf'))
     if (code !== 0 || !fs.existsSync(produced)) throw new Error(latexMessage(output))
     fs.copyFileSync(produced, path.join(dir, path.basename(produced)))
-    clearStepError(id, pdfKey)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'pdflatex failed.'
-    if (readFile(id, pdfKey).kind !== 'pdf') recordProblemError(id, pdfKey, message)
-    throw error instanceof Error ? error : new Error(message)
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true })
   }
