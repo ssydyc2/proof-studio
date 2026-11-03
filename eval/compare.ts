@@ -31,9 +31,10 @@ type Result = {
 }
 
 const results: Result[] = []
-const resultsPath = path.join(root, 'eval', 'compare-results.json')
+const resultsPath = path.join(root, 'eval', 'results', 'compare.json')
 
 function save(): void {
+  fs.mkdirSync(path.dirname(resultsPath), { recursive: true })
   const finished = [...results].sort((a, b) => a.folder.localeCompare(b.folder))
   const payload = {
     total: folders.length,

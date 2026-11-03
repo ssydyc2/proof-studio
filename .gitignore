@@ -5,5 +5,4 @@ dist
 meta_key
 eval/dataset/*/problem.tex
 eval/dataset/*/problem.pdf
-eval/transcribe-results.json
-eval/compare-results.json
+eval/results/

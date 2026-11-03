@@ -13,8 +13,8 @@
     "dmg": "electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "check": "tsx scripts/check-workspace.ts",
-    "eval:transcribe": "tsx scripts/eval-transcribe.ts",
-    "eval:compare": "tsx scripts/eval-compare.ts",
+    "eval:transcribe": "tsx eval/transcribe.ts",
+    "eval:compare": "tsx eval/compare.ts",
     "seed:sample": "tsx scripts/seed-sample.ts"
   },
   "dependencies": {
