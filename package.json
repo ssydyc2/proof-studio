@@ -9,6 +9,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "app": "electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir",
+    "dmg": "electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "check": "tsx scripts/check-workspace.ts",
     "seed:sample": "tsx scripts/seed-sample.ts"

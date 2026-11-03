@@ -12,3 +12,6 @@ mac:
   identity: null
   target:
     - dir
+    - dmg
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
