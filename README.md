@@ -21,10 +21,12 @@ You need Node.js and npm. PDF generation also needs MacTeX, which provides `/Lib
 
 ```bash
 npm install
-npm run dev
+npm start
 ```
 
-`npm run dev` installs nothing extra and opens the Electron app against the local dev server.
+`npm start` builds the app and opens it in Electron on this Mac. The window loads those built files. It does not open a browser.
+
+`npm run dev` is for editing. It also opens Electron, and refreshes that window from a local server while files change. macOS calls both of these processes Electron. `npm run app` writes `ProofStudio.app`, which uses the ProofStudio Dock name.
 
 ## Generate the app
 
@@ -36,7 +38,7 @@ open dist/mac-arm64/ProofStudio.app
 
 `npm run app` writes `dist/mac-arm64/ProofStudio.app`. The Dock and the menu name are ProofStudio.
 
-`out/` is the compiled JavaScript, not the app. `npm run dev` and `npx electron .` launch Electron's own shell, so macOS calls that window Electron.
+`out/` is the compiled JavaScript, not the app. `npm start` and `npm run dev` launch Electron's own shell, so macOS calls that process Electron.
 
 ## Generate a DMG
 
