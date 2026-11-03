@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormalizeProgress } from '../../shared/formalize'
+import type { FormalizeProgress, FormalizeRound } from '../../shared/formalize'
 import {
   fileByKey,
   pdfKeyFor,
@@ -42,6 +42,7 @@ export function App() {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState<Busy>(null)
   const [formalizeProgress, setFormalizeProgress] = useState<FormalizeProgress | null>(null)
+  const [formalizeRounds, setFormalizeRounds] = useState<FormalizeRound[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<ProblemSummary | null>(null)
   const [keyOpen, setKeyOpen] = useState(false)
@@ -66,7 +67,10 @@ export function App() {
     })
     void window.proofStudio.hasApiKey().then(setKeySet)
     void refreshTools()
-    return window.proofStudio.onFormalizeProgress(setFormalizeProgress)
+    return window.proofStudio.onFormalizeProgress((progress) => {
+      setFormalizeProgress(progress)
+      setFormalizeRounds(progress.rounds)
+    })
   }, [])
 
   useEffect(() => {
@@ -197,6 +201,7 @@ export function App() {
   async function formalize(id: string) {
     setBusy('formalize')
     setFormalizeProgress(null)
+    setFormalizeRounds([])
     setError(null)
     try {
       if (draft !== loaded.current) {
@@ -435,6 +440,24 @@ export function App() {
             </button>
           )}
         </header>
+        {(formalizeProgress || formalizeRounds.length > 0) && (
+          <div className="status-bar" aria-live="polite">
+            {formalizeProgress?.phase === 'setup' && <p className="status-wait">Preparing Lean…</p>}
+            {formalizeProgress?.phase === 'attempt' && formalizeRounds.length < formalizeProgress.attempt && (
+              <p className="status-wait">Waiting for statement {formalizeProgress.statement}…</p>
+            )}
+            {formalizeRounds.map((round) => (
+              <p key={round.attempt} className="status-round">
+                <span className="status-index">{round.attempt}</span>
+                <span className="status-state" data-ok={round.ok}>
+                  {round.ok ? 'Compiled' : 'Failed'}
+                </span>
+                <code title={round.returned}>{round.returned}</code>
+                <span className="status-detail">{round.detail}</span>
+              </p>
+            ))}
+          </div>
+        )}
         {error && (
           <p className="banner" role="alert">
             <Icon name="alert" size={15} />
@@ -729,7 +752,7 @@ function actionFor(
 
 function formalizeLabel(progress: FormalizeProgress | null, fallback: string): string {
   if (progress?.phase === 'setup') return 'Preparing Lean…'
-  if (progress?.phase === 'attempt') return `Generating formulation ${progress.attempt} of ${progress.total}…`
+  if (progress?.phase === 'attempt') return `Generating statement ${progress.statement} of ${progress.total}…`
   return fallback
 }
 
@@ -746,7 +769,7 @@ function emptyCopy(key: FileKey): string {
     case 'problemPdf':
       return 'problem.pdf is created when you generate a PDF from problem.tex.'
     case 'leanStub':
-      return 'stub.lean is created from problem.tex and saved in the lean folder. Muse writes three Lean statements of the problem, one at a time. Each proof is sorry, and Lake checks the file against Mathlib.'
+      return 'stub.lean is created from problem.tex and saved in the lean folder. Muse writes two Lean statements of the problem. Each proof is sorry, and Lake checks the file against Mathlib.'
     case 'leanProof':
       return 'Generate Lean proof is not available in this version.'
     case 'readable':

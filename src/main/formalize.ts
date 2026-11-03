@@ -1,4 +1,4 @@
-import { FORMALIZE_ATTEMPTS } from '../shared/formalize'
+import { FORMALIZE_ATTEMPTS, type FormalizeRound } from '../shared/formalize'
 
 export type LeanCompileResult = { ok: true } | { ok: false; output: string }
 
@@ -7,36 +7,46 @@ export async function formalizeSource(options: {
   toolchain: string
   ask: (prompt: string) => Promise<string>
   compile: (source: string) => Promise<LeanCompileResult>
-  onAttempt?: (attempt: number) => void
+  onAttempt?: (attempt: number, statement: number) => void
+  onRound?: (round: FormalizeRound) => void
 }): Promise<string> {
   let accepted: string | null = null
   let latest: { source: string; output: string } | null = null
+  let statement = 1
   let lastOutput = 'lean failed.'
   for (let attempt = 1; attempt <= FORMALIZE_ATTEMPTS; attempt++) {
-    options.onAttempt?.(attempt)
+    options.onAttempt?.(attempt, statement)
     const raw = await options.ask(
-      formalizePrompt(options.tex, options.toolchain, attempt, latest ? { accepted, latest } : null)
+      formalizePrompt(options.tex, options.toolchain, statement, latest ? { accepted, latest } : null)
     )
     const source = extractLean(raw)
+    const report = (ok: boolean, detail: string) => {
+      options.onRound?.({ attempt, ok, returned: oneLine(source), detail })
+    }
     if (!source) {
       lastOutput = 'The Lean file was empty.'
       latest = { source: '', output: lastOutput }
+      report(false, lastOutput)
       continue
     }
-    const shape = formulationError(source, attempt)
-    if (shape) {
-      lastOutput = shape
+    const combined = nextFormulation(accepted, source)
+    if (!combined.ok) {
+      lastOutput = combined.output
       latest = { source, output: lastOutput }
+      report(false, lastOutput)
       continue
     }
-    const result = await options.compile(source)
+    const result = await options.compile(combined.source)
     if (result.ok) {
-      accepted = source
-      latest = { source, output: '' }
+      accepted = combined.source
+      latest = { source: combined.source, output: '' }
+      if (statement < FORMALIZE_ATTEMPTS) statement += 1
+      report(true, 'Compiled.')
       continue
     }
     lastOutput = result.output
     latest = { source, output: result.output }
+    report(false, summarizeLeanFailure(result.output))
   }
   if (accepted) return accepted
   throw new Error(
@@ -44,12 +54,55 @@ export async function formalizeSource(options: {
   )
 }
 
-export function formulationError(source: string, formulations: number): string | null {
-  const sorries = source.match(/\bsorry\b/g)?.length ?? 0
-  if (sorries !== formulations) {
-    return `This round must add formulation ${formulations}. The file needs exactly ${formulations} sorry proofs and no other proofs.`
+export function nextFormulation(
+  accepted: string | null,
+  source: string
+): { ok: true; source: string } | { ok: false; output: string } {
+  const blocks = theoremBlocks(source)
+  if (blocks.some((block) => /iff/i.test(block.name) || linksSavedTheorem(block.text, accepted))) {
+    return {
+      ok: false,
+      output: 'Do not add an iff theorem. Write one new statement of the problem, proved by sorry.'
+    }
   }
-  return null
+  const saved = new Set(theoremBlocks(accepted ?? '').map((block) => block.name))
+  const fresh = blocks.filter((block) => !saved.has(block.name))
+  const chosen = fresh[0]
+  if (!chosen) {
+    return { ok: false, output: 'Add one new statement other than the theorems already saved. The proof is sorry.' }
+  }
+  if (!/\bsorry\b/.test(chosen.text)) return { ok: false, output: 'The new statement must be proved by sorry.' }
+  if (!accepted) {
+    const prelude = preludeOf(source)
+    return { ok: true, source: prelude ? `${prelude}\n\n${chosen.text}` : chosen.text }
+  }
+  return { ok: true, source: `${accepted.trim()}\n\n${chosen.text}` }
+}
+
+function linksSavedTheorem(text: string, accepted: string | null): boolean {
+  if (!accepted || !/↔/.test(text)) return false
+  return theoremBlocks(accepted).some((block) => new RegExp(`\\b${block.name.replace(/\./g, '\\.')}\\b`).test(text))
+}
+
+function theoremBlocks(source: string): { name: string; text: string }[] {
+  const matches = [...source.matchAll(/^[ \t]*(?:theorem|lemma)\s+([A-Za-z0-9_'.]+)/gm)]
+  return matches.map((match, index) => {
+    const start = match.index ?? 0
+    const end = index + 1 < matches.length ? (matches[index + 1].index ?? source.length) : source.length
+    return { name: match[1], text: source.slice(start, end).trim() }
+  })
+}
+
+function preludeOf(source: string): string {
+  const match = /^[ \t]*(?:theorem|lemma)\s+/m.exec(source)
+  if (!match || match.index == null) return ''
+  return source.slice(0, match.index).trim()
+}
+
+function oneLine(source: string): string {
+  const line = source.replace(/\s+/g, ' ').trim()
+  if (!line) return '(empty)'
+  return line.length > 180 ? `${line.slice(0, 180)}…` : line
 }
 
 export function extractLean(text: string): string {
@@ -89,32 +142,28 @@ export function leanHasError(output: string): boolean {
 function formalizePrompt(
   tex: string,
   toolchain: string,
-  round: number,
+  statement: number,
   context: { accepted: string | null; latest: { source: string; output: string } } | null
 ): string {
   const version = toolchain.replace('leanprover/lean4:', '')
-  const shared = `Write one Lean 4 file for ${toolchain} with Mathlib ${version}.
+  const shared = `Write Lean 4 for ${toolchain} with Mathlib ${version}.
 - Import the specific Mathlib modules you need. Do not write \`import Mathlib\`.
 - The file is compiled with \`lake env lean\` in a Lake project that already depends on Mathlib. Do not emit a lakefile or toolchain.
-- Do not solve the problem, and do not prove that the formulations match. No equivalence theorems.
-- Output only the Lean source.`
+- Do not solve the problem.
+- Do not write an iff theorem, an equivalence, or a theorem whose name contains iff.
+- The proof is sorry.
+- Output only Lean source.`
   const task =
-    round === 1
-      ? `This is formulation 1 of 3.
-- theorem statement1 states the problem and is proved by sorry.
-- The file contains exactly one sorry.`
-      : round === 2
-        ? `This is formulation 2 of 3. Keep statement1.
-- theorem statement2 is a different Lean statement of the same problem, proved by sorry.
-- The file contains exactly two sorries.`
-        : `This is formulation 3 of 3. Keep the formulations that already compile.
-- theorem statement3 is another Lean statement of the same problem, proved by sorry.
-- The file contains exactly three sorries.`
+    statement === 1
+      ? `Write theorem statement1 for the problem. One theorem only.`
+      : `The file below compiled. Append theorem statement2 onto it.
+- statement2 is a different Lean statement of the same problem, other than the theorems already saved.
+- Output the complete file with the saved theorems unchanged and statement2 appended. You may instead output only statement2.`
   const parts = [`${shared}\n${task}`, `Problem:\n${tex.trim()}`]
   if (context?.accepted) parts.push(`Lean file so far, which compiled:\n${cap(context.accepted)}`)
   if (context && context.latest.source !== context.accepted) {
     parts.push(
-      `The latest attempt failed. Repair it where you can, and still add this formulation.\n\nLatest file:\n${cap(context.latest.source) || '(empty)'}\n\nFeedback:\n${compilerFeedback(context.latest.output)}`
+      `This attempt failed. Write statement${statement} again.\n\nLatest reply:\n${cap(context.latest.source) || '(empty)'}\n\nFeedback:\n${compilerFeedback(context.latest.output)}`
     )
   }
   return parts.join('\n\n')

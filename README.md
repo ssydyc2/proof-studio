@@ -11,7 +11,7 @@ The steps are:
 3. Generate the Lean proof.
 4. Write a human-readable proof.
 
-Steps 1 and 2 are available. Step 2 turns `problem.tex` into `lean/stub.lean`. That folder is a Lake project (`lean-toolchain`, `lakefile.toml`, `lake-manifest.json`) whose Mathlib packages come from one shared build. The app lists `stub.lean` only. Muse is asked three times, and each question adds one Lean statement of the problem with the previous file as context. Each proof is `sorry`. Each file is checked with `lake env lean`, because a bare `lean` command cannot see Mathlib. A failed round stays in the next question, and a statement that already compiled is kept. When `problem.tex` exists, you can also compile it to `problem.pdf` with the `pdflatex` on this Mac. Later steps stay visible so you can see the files they will use, and their buttons stay off.
+Steps 1 and 2 are available. Step 2 turns `problem.tex` into `lean/stub.lean`. That folder is a Lake project (`lean-toolchain`, `lakefile.toml`, `lake-manifest.json`) whose Mathlib packages come from one shared build. The app lists `stub.lean` only. Muse writes two Lean statements, each proved by `sorry`. If the first does not compile, the next question asks for it again. If it compiles, the next question appends a second statement and does not add an iff theorem. Each file is checked with `lake env lean`, because a bare `lean` command cannot see Mathlib. A statement that already compiled is kept. When `problem.tex` exists, you can also compile it to `problem.pdf` with the `pdflatex` on this Mac. Later steps stay visible so you can see the files they will use, and their buttons stay off.
 
 A Meta Muse API key is entered in the app and kept in memory until you quit. It is not saved to disk.
 

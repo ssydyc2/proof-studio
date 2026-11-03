@@ -65,9 +65,6 @@ theorem statement1 : Nat.Prime 2 := by
 
 theorem statement2 : Nat.Prime (0 + 2) := by
   sorry
-
-theorem statement3 : Nat.Prime (Nat.succ 1) := by
-  sorry
 `
 const withStub = writeLeanStub(compiled.id, stubSource)
 assert.equal(withStub.files.find((file) => file.key === 'leanStub')?.state, 'current')
@@ -130,12 +127,9 @@ fs.writeFileSync(path.join(bin, 'pdflatex'), '')
 assert.equal(findExecutable('pdflatex', [bin]), path.join(bin, 'pdflatex'))
 assert.equal(findExecutable('not-a-proof-studio-tool', [bin]), null)
 
-const { compilerFeedback, extractLean, formalizeSource, formulationError, summarizeLeanFailure } = await import(
+const { compilerFeedback, extractLean, formalizeSource, nextFormulation, summarizeLeanFailure } = await import(
   '../src/main/formalize'
 )
-assert.equal(formulationError(stubSource, 3), null)
-assert.match(formulationError('theorem t : True := by sorry', 3) ?? '', /exactly 3/)
-assert.equal(formulationError('theorem statement1 : Statement1 := by sorry', 1), null)
 const fenced = 'Here is the file.\n```lean\nimport A\n\ntheorem t : True := by\n  sorry\n```\n'
 assert.equal(extractLean(fenced), 'import A\n\ntheorem t : True := by\n  sorry')
 const diagnostic = 'stub.lean:3:8: error: unknown identifier `Foo`\n  Foo\n'
@@ -147,10 +141,18 @@ const formulation1 = `import Mathlib.Data.Nat.Prime.Defs
 theorem statement1 : Nat.Prime 2 := by
   sorry
 `
-const formulation2 = `${formulation1}
-theorem statement2 : Nat.Prime (0 + 2) := by
+const appended = nextFormulation(formulation1.trim(), 'theorem statement2 : Nat.Prime (0 + 2) := by sorry')
+assert.equal(appended.ok, true)
+if (appended.ok) {
+  assert.match(appended.source, /statement1/)
+  assert.match(appended.source, /statement2/)
+  assert.doesNotMatch(appended.source, /iff/)
+}
+const iffReply = `${formulation1}
+theorem statement1_iff_statement2 : statement1 ↔ statement2 := by
   sorry
 `
+assert.equal(nextFormulation(formulation1.trim(), iffReply).ok, false)
 
 let asks = 0
 const prompts: string[] = []
@@ -161,33 +163,58 @@ const recovered = await formalizeSource({
     prompts.push(prompt)
     asks += 1
     if (asks === 1) return formulation1
-    if (asks === 2) return 'theorem broken : NotAType := by sorry'
-    return `\`\`\`lean\n${stubSource}\`\`\``
+    return 'theorem statement2 : Nat.Prime (0 + 2) := by sorry'
   },
   compile: async (source) => {
     assert.match(source, /\bsorry\b/)
+    assert.doesNotMatch(source, /iff/)
     return { ok: true }
   }
 })
-assert.equal(asks, 3)
-assert.equal(recovered, stubSource.trim())
+assert.equal(asks, 2)
+assert.match(recovered, /statement1/)
+assert.match(recovered, /statement2/)
+assert.match(prompts[1], /Append theorem statement2/)
 assert.match(prompts[1], /Lean file so far/)
-assert.match(prompts[2], /latest attempt failed/)
 
-let keptAsks = 0
+let retryAsks = 0
+const retryPrompts: string[] = []
+const retried = await formalizeSource({
+  tex: 'Prove that 2 is prime.',
+  toolchain: 'leanprover/lean4:v4.31.0',
+  ask: async (prompt) => {
+    retryPrompts.push(prompt)
+    retryAsks += 1
+    return formulation1
+  },
+  compile: async () => {
+    if (retryAsks === 1) return { ok: false, output: 'stub.lean:1:16: error: unknown identifier `NotAType`' }
+    return { ok: true }
+  }
+})
+assert.equal(retryAsks, 2)
+assert.match(retried, /statement1/)
+assert.doesNotMatch(retried, /statement2/)
+assert.match(retryPrompts[1], /statement1/)
+assert.match(retryPrompts[1], /Write statement1 again/)
+assert.doesNotMatch(retryPrompts[1], /statement2/)
+
+let iffAsks = 0
 const kept = await formalizeSource({
   tex: 'Prove that 2 is prime.',
   toolchain: 'leanprover/lean4:v4.31.0',
   ask: async () => {
-    keptAsks += 1
-    if (keptAsks === 1) return formulation1
-    if (keptAsks === 2) return formulation2
-    return 'theorem dropped : False := by sorry'
+    iffAsks += 1
+    if (iffAsks === 1) return formulation1
+    return 'theorem statement1_iff_statement2 : statement1 ↔ statement2 := by sorry'
   },
-  compile: async () => ({ ok: true })
+  compile: async (source) => {
+    assert.doesNotMatch(source, /iff/)
+    return { ok: true }
+  }
 })
-assert.equal(keptAsks, 3)
-assert.equal(kept, formulation2.trim())
+assert.match(kept, /statement1/)
+assert.doesNotMatch(kept, /iff/)
 
 let failures = 0
 let failureAsks = 0
@@ -197,18 +224,16 @@ await assert.rejects(
     toolchain: 'leanprover/lean4:v4.31.0',
     ask: async () => {
       failureAsks += 1
-      if (failureAsks === 1) return formulation1
-      if (failureAsks === 2) return formulation2
-      return stubSource
+      return `theorem statement1 : NotAType := by sorry`
     },
     compile: async () => {
       failures += 1
       return { ok: false, output: 'stub.lean:1:16: error: unknown identifier `NotAType`' }
     }
   }),
-  /after 3 attempts/
+  /after 2 attempts/
 )
-assert.equal(failureAsks, 3)
-assert.equal(failures, 3)
+assert.equal(failureAsks, 2)
+assert.equal(failures, 2)
 
 console.log(`workspace check passed in ${root}`)

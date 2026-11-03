@@ -546,6 +546,64 @@ button:disabled:hover {
   box-shadow: none;
 }
 
+.status-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--canvas);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.status-wait,
+.status-round {
+  margin: 0;
+  min-width: 0;
+}
+
+.status-wait {
+  color: var(--muted);
+}
+
+.status-round {
+  display: grid;
+  grid-template-columns: 16px 64px minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.status-index {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-state[data-ok='true'] {
+  color: var(--green);
+}
+
+.status-state[data-ok='false'] {
+  color: var(--red);
+}
+
+.status-round code,
+.status-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-round code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.status-detail {
+  color: var(--muted);
+}
+
 .banner {
   display: flex;
   align-items: center;

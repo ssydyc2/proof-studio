@@ -79,12 +79,19 @@ export async function formalizeProblem(
   if (texFile.kind !== 'text' || !texFile.text.trim()) throw new Error('No problem text yet.')
   const key = apiKey
   try {
-    onProgress?.({ phase: 'setup', attempt: 0, total: FORMALIZE_ATTEMPTS })
+    const rounds: FormalizeProgress['rounds'] = []
+    const publish = (progress: FormalizeProgress) => onProgress?.(progress)
+    publish({ phase: 'setup', attempt: 0, total: FORMALIZE_ATTEMPTS, statement: 1, rounds })
     const project = await prepareLean()
     const source = await formalizeSource({
       tex: texFile.text,
       toolchain: project.toolchain,
-      onAttempt: (attempt) => onProgress?.({ phase: 'attempt', attempt, total: FORMALIZE_ATTEMPTS }),
+      onAttempt: (attempt, statement) =>
+        publish({ phase: 'attempt', attempt, total: FORMALIZE_ATTEMPTS, statement, rounds: [...rounds] }),
+      onRound: (round) => {
+        rounds.push(round)
+        publish({ phase: 'round', attempt: round.attempt, total: FORMALIZE_ATTEMPTS, statement: 1, rounds: [...rounds] })
+      },
       ask: (prompt) => askMuse(key, prompt),
       compile: compileLeanSource
     })
