@@ -2,6 +2,8 @@
 
 ProofStudio is a macOS app for working on a math proof, one step at a time.
 
+![ProofStudio with a Lean proof beside the generated solution PDF](docs/demo.jpg)
+
 You open a folder. The folder name is the problem name. The app keeps the files for that problem inside the folder and shows whether each one is empty, current, stale, or failed. You choose the next step. The app does not run the whole pipeline for you.
 
 The steps are:
