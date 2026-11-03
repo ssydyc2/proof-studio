@@ -20,7 +20,7 @@ const folders = fs
   .sort()
 if (folders.length === 0) throw new Error('No problem folders matched.')
 
-const { judgeProblemImages } = await import('../src/main/muse')
+const { judgeProblemImages } = await import('./muse')
 
 type Result = {
   folder: string

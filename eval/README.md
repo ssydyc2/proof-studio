@@ -5,6 +5,7 @@ Everything for evaluation lives in this folder.
 - `dataset/` holds 50 exercises from the [ProofNet informal benchmark](https://github.com/zhangir-azerbayev/ProofNet/tree/main/benchmark/benchmark_to_publish/informal). Each problem folder has `source.png` and `meta.json`. `render_dataset.py` rebuilds the screenshots.
 - `meta_key` is the Meta API key. It is not committed.
 - One script per step, run from the repo root. A folder name limits the run to one problem.
+- `muse.ts` is the Meta API client for eval-only calls. Screenshot transcription stays in the app, because generating TeX uses it.
 - `results/` holds each step's output and is not committed. Generated `problem.tex` and `problem.pdf` stay in the problem folder and are not committed.
 
 ## Transcribe
