@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { getDocument, GlobalWorkerOptions, TextLayer, type PDFDocumentLoadingTask, type RenderTask } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -6,7 +6,7 @@ GlobalWorkerOptions.workerSrc = workerUrl
 
 type Menu = { x: number; y: number; text: string }
 
-export function PdfView({
+export const PdfView = memo(function PdfView({
   dataUrl,
   onLeanComponent
 }: {
@@ -23,32 +23,32 @@ export function PdfView({
   useEffect(() => {
     const host = scroller.current
     if (!host) return
+    const measure = () => Math.floor(host.offsetWidth)
     const observer = new ResizeObserver(() => {
-      const next = Math.floor(host.clientWidth)
+      const next = measure()
       setWidth((current) => (Math.abs(current - next) > 8 ? next : current))
     })
     observer.observe(host)
-    setWidth(Math.floor(host.clientWidth))
+    setWidth(measure())
     return () => observer.disconnect()
   }, [failed])
 
   useEffect(() => {
     const root = pages.current
-    if (!root || width < 80) return
+    const host = scroller.current
+    if (!root || !host || width < 80) return
+    const view = host
     let cancelled = false
     const jobs: Array<{ cancel: () => void }> = []
     let loading: PDFDocumentLoadingTask | null = null
-    root.replaceChildren()
 
-    async function draw() {
-      loading = getDocument({ data: pdfBytes(dataUrl) })
-      const doc = await loading.promise
-      if (cancelled) return
-      const pageWidth = Math.max(width - 32, 240)
+    async function renderPages(doc: Awaited<PDFDocumentLoadingTask['promise']>, gutter: number) {
+      const pageWidth = Math.max(width - 32 - gutter, 240)
+      const built: HTMLDivElement[] = []
       for (let number = 1; number <= doc.numPages; number += 1) {
-        if (cancelled) return
+        if (cancelled) return null
         const page = await doc.getPage(number)
-        if (cancelled) return
+        if (cancelled) return null
         const unscaled = page.getViewport({ scale: 1 })
         const viewport = page.getViewport({ scale: pageWidth / unscaled.width })
         const wrap = document.createElement('div')
@@ -64,7 +64,7 @@ export function PdfView({
         const text = document.createElement('div')
         text.className = 'textLayer'
         wrap.append(canvas, text)
-        root?.append(wrap)
+        built.push(wrap)
         const task: RenderTask = page.render({
           canvas,
           viewport,
@@ -78,6 +78,29 @@ export function PdfView({
         jobs.push(task, layer)
         await Promise.all([task.promise, layer.render()])
       }
+      return cancelled ? null : built
+    }
+
+    function show(built: HTMLDivElement[]) {
+      if (!pages.current) return
+      const top = view.scrollTop
+      pages.current.replaceChildren(...built)
+      view.scrollTop = top
+    }
+
+    async function draw() {
+      loading = getDocument({ data: pdfBytes(dataUrl) })
+      const doc = await loading.promise
+      if (cancelled) return
+      const gutter = Math.max(view.offsetWidth - view.clientWidth, 0)
+      const built = await renderPages(doc, gutter)
+      if (!built) return
+      show(built)
+      const fitted = Math.max(view.offsetWidth - view.clientWidth, 0)
+      if (fitted <= gutter + 1) return
+      const again = await renderPages(doc, fitted)
+      if (!again) return
+      show(again)
     }
 
     void draw().catch(() => {
@@ -143,7 +166,7 @@ export function PdfView({
       )}
     </div>
   )
-}
+})
 
 function selectedPdfText(root: HTMLElement): string {
   const selection = window.getSelection()

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ExplainProgress, ExplainRound } from '../../shared/explain'
 import { leanLines, type LeanRange } from '../../shared/locate'
 import type { FormalizeProgress, FormalizeRound } from '../../shared/formalize'
@@ -71,6 +71,10 @@ export function App() {
   const fileInput = useRef<HTMLInputElement>(null)
   const pendingAfterKey = useRef<'transcribe' | 'formalize' | 'prove' | 'explain' | 'locate' | null>(null)
   const pendingPassage = useRef('')
+  const locateRef = useRef<(passage: string) => void>(() => {})
+  const askLean = useCallback((text: string) => {
+    locateRef.current(text)
+  }, [])
 
   selectedIdRef.current = selectedId
   const selected = problems.find((problem) => problem.id === selectedId) ?? null
@@ -369,6 +373,7 @@ export function App() {
       if (locateGen.current === request) setLocating(false)
     }
   }
+  locateRef.current = locate
 
   async function makePdf(texKey: TexSourceKey) {
     if (!selected || busy) return
@@ -654,12 +659,6 @@ export function App() {
             }))}
           />
         )}
-        {locating && (
-          <p className="banner info">
-            <Icon name="sparkle" size={15} />
-            Finding the Lean lines…
-          </p>
-        )}
         {error && (
           <p className="banner" role="alert">
             <Icon name="alert" size={15} />
@@ -675,6 +674,7 @@ export function App() {
               onDraft={setDraft}
               onAddScreenshot={() => fileInput.current?.click()}
               ranges={pair.right === 'solutionPdf' ? leanRanges : undefined}
+              locating={pair.right === 'solutionPdf' && locating}
             />
             <Pane
               file={fileByKey(selected.files, pair.right)}
@@ -682,7 +682,7 @@ export function App() {
               draft={draft}
               onDraft={setDraft}
               onAddScreenshot={() => fileInput.current?.click()}
-              onLeanComponent={pair.right === 'solutionPdf' ? (text) => void locate(text) : undefined}
+              onLeanComponent={pair.right === 'solutionPdf' ? askLean : undefined}
             />
           </div>
         ) : (
@@ -769,6 +769,7 @@ function Pane({
   onDraft,
   onAddScreenshot,
   ranges,
+  locating,
   onLeanComponent
 }: {
   file: ProblemFileView | undefined
@@ -777,6 +778,7 @@ function Pane({
   onDraft: (value: string) => void
   onAddScreenshot: () => void
   ranges?: LeanRange[]
+  locating?: boolean
   onLeanComponent?: (text: string) => void
 }) {
   if (!file) return null
@@ -789,6 +791,7 @@ function Pane({
         <span className="file-state" data-state={file.state}>
           {STATE_LABEL[file.state]}
         </span>
+        {locating && <span className="pane-status">Finding the Lean lines…</span>}
       </header>
       <div className="pane-body">
         {content?.kind === 'image' && <img className="preview" src={content.dataUrl} alt="Problem screenshot" />}
@@ -873,9 +876,14 @@ function LeanCode({ text, ranges }: { text: string; ranges: LeanRange[] }) {
   const view = useRef<HTMLDivElement>(null)
   const mark = ranges.map((range) => `${range.start}-${range.end}`).join(',')
   useEffect(() => {
+    const root = view.current
     const first = ranges[0]?.start
-    if (!first) return
-    view.current?.querySelector(`[data-line="${first}"]`)?.scrollIntoView({ block: 'center' })
+    if (!root || !first) return
+    const line = root.querySelector(`[data-line="${first}"]`)
+    if (!(line instanceof HTMLElement)) return
+    const rootRect = root.getBoundingClientRect()
+    const lineRect = line.getBoundingClientRect()
+    root.scrollTop += lineRect.top - rootRect.top - (root.clientHeight - lineRect.height) / 2
   }, [mark, ranges])
   const lines = leanLines(text)
   return (

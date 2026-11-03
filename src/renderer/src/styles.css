@@ -717,6 +717,12 @@ button:disabled:hover {
   font-weight: 500;
 }
 
+.pane-status {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 550;
+}
+
 .pane-bar .file-state {
   padding: 2px 8px;
   border-radius: 99px;
@@ -788,6 +794,7 @@ button:disabled:hover {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   padding: 16px;
   background: #f7f9fc;
 }
