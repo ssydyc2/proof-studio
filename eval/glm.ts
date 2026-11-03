@@ -21,18 +21,46 @@ Treat these as different:
 Reply with JSON only, no Markdown:
 {"same":true,"reason":"one sentence"}`
 
+const FORMALIZE_PROMPT = `The image is a mathematics problem. The Lean 4 text is an attempt to state that problem twice. The proofs are sorry and are not part of the check.
+
+Decide whether both theorems are correct statements of this same problem. They may use different Lean encodings.
+
+A statement is wrong when it drops or changes a hypothesis, changes a quantifier, index, exponent, or constant, or claims something other than the problem.
+
+Reply with JSON only, no Markdown:
+{"same":true,"reason":"one sentence"}`
+
+type ContentPart = { type: string; text?: string; image_url?: { url: string } }
+
 export async function judgeProblemImages(
   key: string,
   screenshot: Buffer,
   pages: Buffer[]
 ): Promise<{ same: boolean; reason: string }> {
+  if (pages.length === 0) throw new Error('The PDF has no pages.')
+  const images = [screenshot, ...pages].map(imagePart)
+  return ask(key, [...images, { type: 'text', text: JUDGE_PROMPT }])
+}
+
+export async function judgeFormalization(
+  key: string,
+  screenshot: Buffer,
+  lean: string
+): Promise<{ same: boolean; reason: string }> {
+  const source = lean.length > 20_000 ? `${lean.slice(0, 20_000)}\n…` : lean
+  return ask(key, [
+    imagePart(screenshot),
+    { type: 'text', text: `${FORMALIZE_PROMPT}\n\nLean:\n${source}` }
+  ])
+}
+
+function imagePart(bytes: Buffer): ContentPart {
+  return { type: 'image_url', image_url: { url: `data:image/png;base64,${bytes.toString('base64')}` } }
+}
+
+async function ask(key: string, content: ContentPart[]): Promise<{ same: boolean; reason: string }> {
   const trimmed = key.trim()
   if (!trimmed) throw new Error('Enter an API key.')
-  if (pages.length === 0) throw new Error('The PDF has no pages.')
-  const images = [screenshot, ...pages].map((bytes) => ({
-    type: 'image_url',
-    image_url: { url: `data:image/png;base64,${bytes.toString('base64')}` }
-  }))
   const response = await fetch(`${BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -46,12 +74,7 @@ export async function judgeProblemImages(
       max_tokens: 4096,
       reasoning_effort: 'high',
       thinking: { type: 'enabled', clear_thinking: false },
-      messages: [
-        {
-          role: 'user',
-          content: [...images, { type: 'text', text: JUDGE_PROMPT }]
-        }
-      ]
+      messages: [{ role: 'user', content }]
     }),
     signal: AbortSignal.timeout(180_000)
   })

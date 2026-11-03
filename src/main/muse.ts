@@ -95,6 +95,32 @@ async function transcribeImage(key: string, bytes: Buffer, mime: string): Promis
   return stripFence(response.output_text ?? '')
 }
 
+export async function formalizeTex(
+  key: string,
+  tex: string,
+  onProgress?: (progress: FormalizeProgress) => void
+): Promise<string> {
+  const trimmed = key.trim()
+  if (!trimmed) throw new Error('Enter an API key.')
+  if (!tex.trim()) throw new Error('No problem text yet.')
+  const rounds: FormalizeProgress['rounds'] = []
+  const publish = (progress: FormalizeProgress) => onProgress?.(progress)
+  publish({ phase: 'setup', attempt: 0, total: FORMALIZE_ATTEMPTS, statement: 1, rounds })
+  const project = await prepareLean()
+  return formalizeSource({
+    tex,
+    toolchain: project.toolchain,
+    onAttempt: (attempt, statement) =>
+      publish({ phase: 'attempt', attempt, total: FORMALIZE_ATTEMPTS, statement, rounds: [...rounds] }),
+    onRound: (round) => {
+      rounds.push(round)
+      publish({ phase: 'round', attempt: round.attempt, total: FORMALIZE_ATTEMPTS, statement: 1, rounds: [...rounds] })
+    },
+    ask: (prompt) => askMuse(trimmed, prompt),
+    compile: compileLeanSource
+  })
+}
+
 export async function formalizeProblem(
   id: string,
   onProgress?: (progress: FormalizeProgress) => void
@@ -104,22 +130,7 @@ export async function formalizeProblem(
   if (texFile.kind !== 'text' || !texFile.text.trim()) throw new Error('No problem text yet.')
   const key = apiKey
   try {
-    const rounds: FormalizeProgress['rounds'] = []
-    const publish = (progress: FormalizeProgress) => onProgress?.(progress)
-    publish({ phase: 'setup', attempt: 0, total: FORMALIZE_ATTEMPTS, statement: 1, rounds })
-    const project = await prepareLean()
-    const source = await formalizeSource({
-      tex: texFile.text,
-      toolchain: project.toolchain,
-      onAttempt: (attempt, statement) =>
-        publish({ phase: 'attempt', attempt, total: FORMALIZE_ATTEMPTS, statement, rounds: [...rounds] }),
-      onRound: (round) => {
-        rounds.push(round)
-        publish({ phase: 'round', attempt: round.attempt, total: FORMALIZE_ATTEMPTS, statement: 1, rounds: [...rounds] })
-      },
-      ask: (prompt) => askMuse(key, prompt),
-      compile: compileLeanSource
-    })
+    const source = await formalizeTex(key, texFile.text, onProgress)
     const summary = writeLeanStub(id, source)
     const dir = problemDirectory(id)
     await installLeanProject(path.join(dir, PROBLEM_ENV))
