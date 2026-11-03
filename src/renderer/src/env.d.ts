@@ -1,4 +1,5 @@
 import type { FileContent, FileKey, ProblemSummary, TexSourceKey } from '../../shared/problem'
+import type { ToolId, ToolStatus } from '../../shared/toolchain'
 
 export interface ProofStudioApi {
   listProblems: () => Promise<ProblemSummary[]>
@@ -11,6 +12,8 @@ export interface ProofStudioApi {
   setApiKey: (key: string) => Promise<void>
   transcribe: (id: string) => Promise<ProblemSummary[]>
   compilePdf: (id: string, sourceKey: TexSourceKey) => Promise<ProblemSummary[]>
+  toolchainStatus: () => Promise<ToolStatus[]>
+  openInstall: (id: ToolId) => Promise<void>
 }
 
 declare global {

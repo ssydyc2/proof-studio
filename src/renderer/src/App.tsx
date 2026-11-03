@@ -8,6 +8,7 @@ import {
   type ProblemSummary,
   type TexSourceKey
 } from '../../shared/problem'
+import type { ToolStatus } from '../../shared/toolchain'
 
 const ACCEPTED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const STATE_LABEL = {
@@ -43,6 +44,8 @@ export function App() {
   const [keyDraft, setKeyDraft] = useState('')
   const [keySet, setKeySet] = useState(false)
   const [loadTick, setLoadTick] = useState(0)
+  const [tools, setTools] = useState<ToolStatus[] | null>(null)
+  const [checkingTools, setCheckingTools] = useState(false)
   const loaded = useRef('')
   const fileInput = useRef<HTMLInputElement>(null)
   const pendingAfterKey = useRef(false)
@@ -58,6 +61,7 @@ export function App() {
       if (nextProblems[0]) setSelectedId(nextProblems[0].id)
     })
     void window.proofStudio.hasApiKey().then(setKeySet)
+    void refreshTools()
   }, [])
 
   useEffect(() => {
@@ -111,6 +115,17 @@ export function App() {
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
   })
+
+  async function refreshTools() {
+    setCheckingTools(true)
+    try {
+      setTools(await window.proofStudio.toolchainStatus())
+    } catch (cause: unknown) {
+      setError(messageOf(cause))
+    } finally {
+      setCheckingTools(false)
+    }
+  }
 
   async function removeProblem(problem: ProblemSummary) {
     try {
@@ -299,6 +314,38 @@ export function App() {
               )}
             </section>
           ))}
+        </div>
+        <div className="environment">
+          <div className="section-label">Environment</div>
+          {tools?.map((tool) =>
+            tool.ready ? (
+              <div key={tool.id} className="env-row" title={tool.detail}>
+                <span>{tool.label}</span>
+                <span className="env-state" data-ready="true">
+                  Ready
+                </span>
+              </div>
+            ) : (
+              <button
+                key={tool.id}
+                className="env-row missing"
+                type="button"
+                title={tool.hint}
+                onClick={() => void window.proofStudio.openInstall(tool.id)}
+              >
+                <span>{tool.label}</span>
+                <span className="env-state" data-ready="false">
+                  Install
+                </span>
+              </button>
+            )
+          )}
+          {tools?.some((tool) => !tool.ready) && (
+            <p className="env-hint">{tools.filter((tool) => !tool.ready).map((tool) => tool.hint).join(' ')}</p>
+          )}
+          <button className="env-check" type="button" disabled={checkingTools} onClick={() => void refreshTools()}>
+            {checkingTools ? 'Checking…' : 'Check again'}
+          </button>
         </div>
         <button
           className="key-button"

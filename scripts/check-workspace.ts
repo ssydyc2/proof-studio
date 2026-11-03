@@ -90,4 +90,10 @@ deleteProblem('problem-abc123')
 assert.equal(fs.existsSync(untitledDir), false)
 assert.equal((await import('../src/main/workspace')).listProblems().some((problem) => problem.id === 'problem-abc123'), false)
 
+const { findExecutable } = await import('../src/main/toolchain')
+const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'proof-studio-bin-'))
+fs.writeFileSync(path.join(bin, 'pdflatex'), '')
+assert.equal(findExecutable('pdflatex', [bin]), path.join(bin, 'pdflatex'))
+assert.equal(findExecutable('not-a-proof-studio-tool', [bin]), null)
+
 console.log(`workspace check passed in ${root}`)

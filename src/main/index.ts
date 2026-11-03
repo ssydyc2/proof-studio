@@ -1,9 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron'
 import path from 'node:path'
 import { compileTex } from './latex'
 import { hasApiKey, setApiKey, transcribeProblem } from './muse'
+import { installUrl, toolchainStatus } from './toolchain'
 import { addSource, deleteProblem, listProblems, openProblemFolder, readFile, writeProblemText } from './workspace'
 import { PROBLEM_FILES, type FileKey, type TexSourceKey } from '../shared/problem'
+import type { ToolId } from '../shared/toolchain'
 
 const FILE_KEYS = new Set<FileKey>(PROBLEM_FILES.map((file) => file.key))
 
@@ -76,6 +78,11 @@ function registerIpc(): void {
     if (sourceKey !== 'problemText' && sourceKey !== 'readable') throw new Error('Unknown file.')
     await compileTex(id, sourceKey)
     return listProblems()
+  })
+  ipcMain.handle('environment:status', () => toolchainStatus())
+  ipcMain.handle('environment:open', (_event, id: ToolId) => {
+    if (id !== 'tex' && id !== 'lean') throw new Error('Unknown tool.')
+    return shell.openExternal(installUrl(id))
   })
 }
 
