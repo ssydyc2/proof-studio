@@ -26,7 +26,7 @@ npm run eval:compare -- 01-putnam-2020-b5
 
 ## Formalize
 
-`npm run eval:formalize` writes two Lean statements with the app's formalize path. Each problem gets `lean/<folder>/stub.lean`. A file that does not contain two compiled statements is a failure. GLM then checks the two statements against `source.png`. The outcome is `results/formalize.json`.
+`npm run eval:formalize` writes two Lean statements with the app's formalize path. Each problem gets `lean/<folder>/stub.lean`. GLM checks a file that contains two statements against `source.png`. The outcome is `results/formalize.json`. A single compiled statement is still a usable formalization, because a second wording is not always available.
 
 ```
 npm run eval:formalize -- 01-putnam-2020-b5
@@ -44,8 +44,8 @@ GLM 5.3 Flash judged 49 of 50 as the same problem. It marked 31 (Herstein 2.2.5)
 
 ### Formalize
 
-35 of 50 produced two compiled statements that GLM judged correct.
+45 of 50 produced a compiled statement. The 10 that stopped at one statement are counted here: 02, 10, 22, 24, 28, 29, 32, 34, 46, 50. A second wording is not always available.
 
-- Could not produce two statements (10): 02, 10, 22, 24, 28, 29, 32, 34, 46, 50.
-- Did not compile (4): 05, 17, 25, 44.
-- Did not match the problem (1): 08. The second statement adds the condition that the radicand is positive.
+4 did not compile: 05, 17, 25, 44.
+
+08 compiled two statements. GLM marked the second one different because it requires the expression under the square root to be positive. That call is debatable.
