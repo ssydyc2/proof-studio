@@ -753,7 +753,7 @@ function StatusLog(props: {
   useEffect(() => {
     const node = log.current
     if (node) node.scrollTop = node.scrollHeight
-  }, [props.waiting, props.rounds])
+  }, [props.waiting, props.rounds.length])
   return (
     <div className="status-bar" aria-live="polite" ref={log}>
       {props.waiting && <p className="status-wait">{props.waiting}</p>}

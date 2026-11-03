@@ -582,17 +582,28 @@ button:disabled:hover {
 
 .status-bar {
   display: flex;
-  flex: 1 1 280px;
+  flex: 0 0 auto;
   flex-direction: column;
-  gap: 10px;
-  min-height: 220px;
-  max-height: 46vh;
+  gap: 8px;
+  max-height: 112px;
   margin: 0;
-  padding: 12px 14px;
-  overflow: auto;
+  padding: 8px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
   border-radius: 9px;
   background: var(--canvas);
   box-shadow: inset 0 0 0 1px var(--line);
+  scrollbar-gutter: stable;
+}
+
+.status-bar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.status-bar::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 99px;
+  background: rgba(15, 23, 41, 0.28) padding-box;
 }
 
 .status-wait,
@@ -632,9 +643,7 @@ button:disabled:hover {
 
 .status-detail {
   margin: 0;
-  max-height: 240px;
-  padding: 10px 12px;
-  overflow: auto;
+  padding: 8px 10px;
   border-radius: 8px;
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
