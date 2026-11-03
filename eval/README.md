@@ -3,9 +3,9 @@
 Everything for evaluation lives in this folder.
 
 - `dataset/` holds 50 exercises from the [ProofNet informal benchmark](https://github.com/zhangir-azerbayev/ProofNet/tree/main/benchmark/benchmark_to_publish/informal). Each problem folder has `source.png` and `meta.json`. `render_dataset.py` rebuilds the screenshots.
-- `meta_key` is the Meta API key. It is not committed.
+- `meta_key` is the Meta API key used for transcription. `glm_key` is the GLM API key used for comparison. Neither is committed.
 - One script per step, run from the repo root. A folder name limits the run to one problem.
-- `muse.ts` is the Meta API client for eval-only calls. Screenshot transcription stays in the app, because generating TeX uses it.
+- Screenshot transcription stays in the app, because generating TeX uses it. `glm.ts` calls GLM for the comparison only.
 - `results/` holds each step's output and is not committed. Generated `problem.tex` and `problem.pdf` stay in the problem folder and are not committed.
 
 ## Transcribe
@@ -18,10 +18,10 @@ npm run eval:transcribe -- 01-putnam-2020-b5
 
 ## Compare
 
-`npm run eval:compare` asks the same model whether `source.png` and `problem.pdf` state the same problem. The outcome is `results/compare.json`.
+`npm run eval:compare` asks GLM (`glm-5.3-flash`) whether `source.png` and `problem.pdf` state the same problem. It reads `eval/glm_key`. The outcome is `results/compare.json`.
 
 ```
 npm run eval:compare -- 01-putnam-2020-b5
 ```
 
-All 50 screenshots transcribed and compiled. The comparison judged 49 of 50 as the same problem. It marked Ireland–Rosen 1.30 inconsistent, reading the final denominator as \(\pi\) instead of \(n\). The screenshot and `problem.tex` both say \(\frac{1}{2}+\frac{1}{3}+\cdots+\frac{1}{n}\), so that mark is a false positive.
+All 50 screenshots transcribed and compiled. GLM judged 49 of 50 as the same problem. It marked Herstein 2.2.5 inconsistent, reading \((ab)^5 = a^5 b^5\) as \((ab)^6 = a^5 b^5\). The screenshot and `problem.tex` both have exponent 5, so that mark is a false positive.

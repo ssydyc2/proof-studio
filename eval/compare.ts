@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dataset = path.join(root, 'eval', 'dataset')
-const keyPath = [path.join(root, 'eval', 'meta_key'), path.join(dataset, 'meta_key')].find((item) => fs.existsSync(item))
-if (!keyPath) throw new Error('Put the API key in eval/meta_key.')
+const keyPath = [path.join(root, 'eval', 'glm_key'), path.join(dataset, 'glm_key')].find((item) => fs.existsSync(item))
+if (!keyPath) throw new Error('Put the GLM API key in eval/glm_key.')
 const key = fs.readFileSync(keyPath, 'utf8').trim()
 if (!key) throw new Error('The API key file is empty.')
 
@@ -20,7 +20,7 @@ const folders = fs
   .sort()
 if (folders.length === 0) throw new Error('No problem folders matched.')
 
-const { judgeProblemImages } = await import('./muse')
+const { judgeProblemImages } = await import('./glm')
 
 type Result = {
   folder: string
