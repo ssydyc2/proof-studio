@@ -1,0 +1,402 @@
+[
+  {
+    "folder": "01-putnam-2020-b5",
+    "title": "Four points on the unit circle",
+    "field": "contest",
+    "source": "Putnam",
+    "exercise": "2020 B5",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Putnam.tex"
+  },
+  {
+    "folder": "02-putnam-2018-a5",
+    "title": "A smooth function must dip",
+    "field": "analysis",
+    "source": "Putnam",
+    "exercise": "2018 A5",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Putnam.tex"
+  },
+  {
+    "folder": "03-putnam-2018-b2",
+    "title": "A polynomial with no root in the disc",
+    "field": "complex analysis",
+    "source": "Putnam",
+    "exercise": "2018 B2",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Putnam.tex"
+  },
+  {
+    "folder": "04-putnam-2018-b4",
+    "title": "A zero forces periodicity",
+    "field": "recurrences",
+    "source": "Putnam",
+    "exercise": "2018 B4",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Putnam.tex"
+  },
+  {
+    "folder": "05-putnam-2017-b3",
+    "title": "A $0$-$1$ series takes an irrational value",
+    "field": "power series",
+    "source": "Putnam",
+    "exercise": "2017 B3",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Putnam.tex"
+  },
+  {
+    "folder": "06-putnam-2014-a5",
+    "title": "These polynomials are pairwise coprime",
+    "field": "polynomials",
+    "source": "Putnam",
+    "exercise": "2014 A5",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Putnam.tex"
+  },
+  {
+    "folder": "07-putnam-2000-a2",
+    "title": "Three consecutive sums of two squares",
+    "field": "number theory",
+    "source": "Putnam",
+    "exercise": "2000 A2",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Putnam.tex"
+  },
+  {
+    "folder": "08-putnam-1998-b6",
+    "title": "A cubic is not always a square",
+    "field": "number theory",
+    "source": "Putnam",
+    "exercise": "1998 B6",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Putnam.tex"
+  },
+  {
+    "folder": "09-tripos-primes-3n-plus-2",
+    "title": "Infinitely many primes $3n+2$",
+    "field": "number theory",
+    "source": "Cambridge Tripos",
+    "exercise": "2022 IA 4-I-1E (a)",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Cambridge-Tripos.tex"
+  },
+  {
+    "folder": "10-tripos-cube-roots",
+    "title": "A sum of cube roots is irrational",
+    "field": "number theory",
+    "source": "Cambridge Tripos",
+    "exercise": "2022 IA 4-I-2D (a)",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Cambridge-Tripos.tex"
+  },
+  {
+    "folder": "11-ireland-rosen-1-30",
+    "title": "A partial harmonic sum is never an integer",
+    "field": "number theory",
+    "source": "Ireland–Rosen",
+    "exercise": "1.30",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Ireland-Rosen.tex"
+  },
+  {
+    "folder": "12-ireland-rosen-3-1",
+    "title": "Infinitely many primes congruent to $-1$ modulo $6$",
+    "field": "number theory",
+    "source": "Ireland–Rosen",
+    "exercise": "3.1",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Ireland-Rosen.tex"
+  },
+  {
+    "folder": "13-ireland-rosen-3-4",
+    "title": "A quadratic equation with no integer solution",
+    "field": "number theory",
+    "source": "Ireland–Rosen",
+    "exercise": "3.4",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Ireland-Rosen.tex"
+  },
+  {
+    "folder": "14-ireland-rosen-3-5",
+    "title": "A cubic equation with no integer solution",
+    "field": "number theory",
+    "source": "Ireland–Rosen",
+    "exercise": "3.5",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Ireland-Rosen.tex"
+  },
+  {
+    "folder": "15-ireland-rosen-5-13",
+    "title": "Prime divisors of $x^4 - x^2 + 1$",
+    "field": "number theory",
+    "source": "Ireland–Rosen",
+    "exercise": "5.13",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Ireland-Rosen.tex"
+  },
+  {
+    "folder": "16-artin-3-7-2",
+    "title": "Not a finite union of proper subspaces",
+    "field": "linear algebra",
+    "source": "Artin",
+    "exercise": "3.7.2",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Artin.tex"
+  },
+  {
+    "folder": "17-artin-6-4-2",
+    "title": "Groups of order $pq$ are not simple",
+    "field": "group theory",
+    "source": "Artin",
+    "exercise": "6.4.2",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Artin.tex"
+  },
+  {
+    "folder": "18-artin-10-6-7",
+    "title": "Ideals in the Gaussian integers",
+    "field": "algebra",
+    "source": "Artin",
+    "exercise": "10.6.7",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Artin.tex"
+  },
+  {
+    "folder": "19-artin-11-13-3",
+    "title": "Primes congruent to $-1$ modulo $4$",
+    "field": "number theory",
+    "source": "Artin",
+    "exercise": "11.13.3",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Artin.tex"
+  },
+  {
+    "folder": "20-artin-13-6-10",
+    "title": "A product over a finite field",
+    "field": "field theory",
+    "source": "Artin",
+    "exercise": "13.6.10",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Artin.tex"
+  },
+  {
+    "folder": "21-axler-4-4",
+    "title": "Distinct roots and the derivative",
+    "field": "polynomials",
+    "source": "Axler",
+    "exercise": "4.4",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Axler.tex"
+  },
+  {
+    "folder": "22-axler-5-24",
+    "title": "Invariant subspaces have even dimension",
+    "field": "linear algebra",
+    "source": "Axler",
+    "exercise": "5.24",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Axler.tex"
+  },
+  {
+    "folder": "23-axler-6-3",
+    "title": "A weighted Cauchy--Schwarz inequality",
+    "field": "inequalities",
+    "source": "Axler",
+    "exercise": "6.3",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Axler.tex"
+  },
+  {
+    "folder": "24-axler-7-10",
+    "title": "A normal operator that is a projection",
+    "field": "linear algebra",
+    "source": "Axler",
+    "exercise": "7.10",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Axler.tex"
+  },
+  {
+    "folder": "25-dummit-foote-1-6-23",
+    "title": "An automorphism with one fixed point",
+    "field": "group theory",
+    "source": "Dummit–Foote",
+    "exercise": "1.6.23",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Dummit-Foote.tex"
+  },
+  {
+    "folder": "26-dummit-foote-3-2-21a",
+    "title": "No proper finite-index subgroup of the rationals",
+    "field": "group theory",
+    "source": "Dummit–Foote",
+    "exercise": "3.2.21(a)",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Dummit-Foote.tex"
+  },
+  {
+    "folder": "27-dummit-foote-4-5-13",
+    "title": "A normal Sylow subgroup in order $56$",
+    "field": "group theory",
+    "source": "Dummit–Foote",
+    "exercise": "4.5.13",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Dummit-Foote.tex"
+  },
+  {
+    "folder": "28-dummit-foote-8-3-4",
+    "title": "Sums of two rational squares",
+    "field": "number theory",
+    "source": "Dummit–Foote",
+    "exercise": "8.3.4",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Dummit-Foote.tex"
+  },
+  {
+    "folder": "29-dummit-foote-9-1-6",
+    "title": "An ideal that is not principal",
+    "field": "ring theory",
+    "source": "Dummit–Foote",
+    "exercise": "9.1.6",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Dummit-Foote.tex"
+  },
+  {
+    "folder": "30-dummit-foote-9-4-2d",
+    "title": "An irreducible polynomial from a prime",
+    "field": "polynomials",
+    "source": "Dummit–Foote",
+    "exercise": "9.4.2(d)",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Dummit-Foote.tex"
+  },
+  {
+    "folder": "31-herstein-2-2-5",
+    "title": "Two power laws force commutativity",
+    "field": "group theory",
+    "source": "Herstein",
+    "exercise": "2.2.5",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Herstein.tex"
+  },
+  {
+    "folder": "32-herstein-2-5-52",
+    "title": "An automorphism inverting most elements",
+    "field": "group theory",
+    "source": "Herstein",
+    "exercise": "2.5.52",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Herstein.tex"
+  },
+  {
+    "folder": "33-herstein-4-2-5",
+    "title": "A ring in which every element is a cube root of itself",
+    "field": "ring theory",
+    "source": "Herstein",
+    "exercise": "4.2.5",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Herstein.tex"
+  },
+  {
+    "folder": "34-herstein-4-6-3",
+    "title": "Infinitely many irreducible specializations",
+    "field": "polynomials",
+    "source": "Herstein",
+    "exercise": "4.6.3",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Herstein.tex"
+  },
+  {
+    "folder": "35-munkres-23-9",
+    "title": "A product minus a rectangle stays connected",
+    "field": "topology",
+    "source": "Munkres",
+    "exercise": "23.9",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Munkres.tex"
+  },
+  {
+    "folder": "36-munkres-24-2",
+    "title": "A real function on the circle",
+    "field": "topology",
+    "source": "Munkres",
+    "exercise": "24.2",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Munkres.tex"
+  },
+  {
+    "folder": "37-munkres-27-4",
+    "title": "A connected metric space is uncountable",
+    "field": "topology",
+    "source": "Munkres",
+    "exercise": "27.4",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Munkres.tex"
+  },
+  {
+    "folder": "38-munkres-26-12",
+    "title": "Perfect maps reflect compactness",
+    "field": "topology",
+    "source": "Munkres",
+    "exercise": "26.12",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Munkres.tex"
+  },
+  {
+    "folder": "39-munkres-18-13",
+    "title": "Continuous extensions to the closure",
+    "field": "topology",
+    "source": "Munkres",
+    "exercise": "18.13",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Munkres.tex"
+  },
+  {
+    "folder": "40-pugh-2-46",
+    "title": "Distance between two compact sets",
+    "field": "metric spaces",
+    "source": "Pugh",
+    "exercise": "2.46",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Pugh.tex"
+  },
+  {
+    "folder": "41-pugh-2-41",
+    "title": "The closed unit ball of any norm",
+    "field": "metric spaces",
+    "source": "Pugh",
+    "exercise": "2.41",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Pugh.tex"
+  },
+  {
+    "folder": "42-pugh-3-1",
+    "title": "A squared Lipschitz condition",
+    "field": "analysis",
+    "source": "Pugh",
+    "exercise": "3.1",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Pugh.tex"
+  },
+  {
+    "folder": "43-rudin-3-7",
+    "title": "Square roots over $n$",
+    "field": "series",
+    "source": "Rudin",
+    "exercise": "3.7",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Rudin.tex"
+  },
+  {
+    "folder": "44-rudin-3-8",
+    "title": "A monotonic factor preserves convergence",
+    "field": "series",
+    "source": "Rudin",
+    "exercise": "3.8",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Rudin.tex"
+  },
+  {
+    "folder": "45-rudin-4-15",
+    "title": "A continuous open map of the line",
+    "field": "analysis",
+    "source": "Rudin",
+    "exercise": "4.15",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Rudin.tex"
+  },
+  {
+    "folder": "46-rudin-5-4",
+    "title": "A polynomial with a root in $(0,1)$",
+    "field": "calculus",
+    "source": "Rudin",
+    "exercise": "5.4",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Rudin.tex"
+  },
+  {
+    "folder": "47-rudin-5-17",
+    "title": "A lower bound on the third derivative",
+    "field": "calculus",
+    "source": "Rudin",
+    "exercise": "5.17",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Rudin.tex"
+  },
+  {
+    "folder": "48-shakarchi-3-14",
+    "title": "Injective entire functions are linear",
+    "field": "complex analysis",
+    "source": "Stein–Shakarchi",
+    "exercise": "3.14",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Shakarchi.tex"
+  },
+  {
+    "folder": "49-shakarchi-3-22",
+    "title": "No holomorphic extension of $1/z$",
+    "field": "complex analysis",
+    "source": "Stein–Shakarchi",
+    "exercise": "3.22",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Shakarchi.tex"
+  },
+  {
+    "folder": "50-shakarchi-5-1",
+    "title": "Zeros of a bounded holomorphic function",
+    "field": "complex analysis",
+    "source": "Stein–Shakarchi",
+    "exercise": "5.1",
+    "url": "https://github.com/zhangir-azerbayev/ProofNet/blob/main/benchmark/benchmark_to_publish/informal/Shakarchi.tex"
+  }
+]
