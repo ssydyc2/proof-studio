@@ -288,7 +288,7 @@ svg {
   box-shadow: inset 0 0 0 1.5px var(--faint);
 }
 
-.file-dot[data-state='current'] {
+.file-dot[data-state='completed'] {
   background: var(--green);
   box-shadow: 0 0 0 3px rgba(18, 161, 80, 0.14);
 }
@@ -319,7 +319,7 @@ svg {
   font-size: 11px;
 }
 
-.file-state[data-state='current'] {
+.file-state[data-state='completed'] {
   color: var(--green);
 }
 
@@ -718,7 +718,7 @@ button:disabled:hover {
   font-weight: 550;
 }
 
-.pane-bar .file-state[data-state='current'] {
+.pane-bar .file-state[data-state='completed'] {
   background: rgba(18, 161, 80, 0.1);
 }
 

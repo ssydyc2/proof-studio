@@ -13,7 +13,7 @@ export const PROBLEM_FILES = [
 
 export type FileKey = (typeof PROBLEM_FILES)[number]['key']
 
-export type FileState = 'empty' | 'current' | 'stale' | 'failed'
+export type FileState = 'empty' | 'completed' | 'stale' | 'failed'
 
 export type NextStep = 'add-screenshot' | 'transcribe' | 'formalize' | 'prove' | 'explain'
 
@@ -95,7 +95,7 @@ export function fileState(
   ) {
     return 'stale'
   }
-  return 'current'
+  return 'completed'
 }
 
 export function buildFileViews(snaps: FileSnapshot[], errors: StepErrors | undefined): ProblemFileView[] {
@@ -125,10 +125,10 @@ export function nextStep(files: ProblemFileView[]): NextStep | null {
   if (!source || !problemText || !leanStub || !leanProof || !solutionTex) return 'add-screenshot'
 
   if (source.state === 'empty' || source.state === 'failed') return 'add-screenshot'
-  if (source.state === 'current' && problemText.state !== 'current') return 'transcribe'
-  if (problemText.state === 'current' && leanStub.state !== 'current') return 'formalize'
-  if (leanStub.state === 'current' && leanProof.state !== 'current') return 'prove'
-  if (leanProof.state === 'current' && solutionTex.state !== 'current') return 'explain'
+  if (source.state === 'completed' && problemText.state !== 'completed') return 'transcribe'
+  if (problemText.state === 'completed' && leanStub.state !== 'completed') return 'formalize'
+  if (leanStub.state === 'completed' && leanProof.state !== 'completed') return 'prove'
+  if (leanProof.state === 'completed' && solutionTex.state !== 'completed') return 'explain'
   return null
 }
 

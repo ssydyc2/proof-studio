@@ -28,7 +28,7 @@ const problem = openProblemFolder(folder)
 assert.equal(problem.title, 'Infinitely many primes')
 addSource(problem.id, image, 'image/png')
 const withSource = (await import('../src/main/workspace')).listProblems()[0]
-assert.equal(withSource.files.find((file) => file.key === 'source')?.state, 'current')
+assert.equal(withSource.files.find((file) => file.key === 'source')?.state, 'completed')
 assert.equal(withSource.files.find((file) => file.key === 'source')?.filename, 'source.png')
 assert.equal(withSource.files.find((file) => file.key === 'problemText')?.filename, 'problem.tex')
 assert.equal(withSource.files.find((file) => file.key === 'problemText')?.state, 'empty')
@@ -50,13 +50,13 @@ if (stored.kind === 'image') {
 const { writeProblemText } = await import('../src/main/workspace')
 const written = writeProblemText(withSource.id, tex)
 assert.equal(written.title, 'Infinitely many primes')
-assert.equal(written.files.find((file) => file.key === 'problemText')?.state, 'current')
+assert.equal(written.files.find((file) => file.key === 'problemText')?.state, 'completed')
 assert.equal(written.nextStep, 'formalize')
 
 await compileTex(written.id, 'problemText')
 const compiled = (await import('../src/main/workspace')).listProblems()[0]
 const pdf = compiled.files.find((file) => file.key === 'problemPdf')
-assert.equal(pdf?.state, 'current')
+assert.equal(pdf?.state, 'completed')
 const pdfBytes = fs.readFileSync(path.join(folder, 'problem.pdf'))
 assert.equal(pdfBytes.subarray(0, 5).toString(), '%PDF-')
 
@@ -76,7 +76,7 @@ theorem statement2 : Nat.Prime (0 + 2) := by
   sorry
 `
 const withStub = writeLeanStub(compiled.id, stubSource)
-assert.equal(withStub.files.find((file) => file.key === 'leanStub')?.state, 'current')
+assert.equal(withStub.files.find((file) => file.key === 'leanStub')?.state, 'completed')
 assert.equal(withStub.nextStep, 'prove')
 assert.equal(fs.existsSync(path.join(folder, 'stub.lean')), false)
 assert.equal(fs.readFileSync(path.join(folder, 'problem', 'stub.lean'), 'utf8'), stubSource)
@@ -89,7 +89,7 @@ theorem statement1 : Nat.Prime 2 := by
 `
 const { writeLeanProof } = await import('../src/main/workspace')
 const withProof = writeLeanProof(compiled.id, proofSource)
-assert.equal(withProof.files.find((file) => file.key === 'leanProof')?.state, 'current')
+assert.equal(withProof.files.find((file) => file.key === 'leanProof')?.state, 'completed')
 assert.equal(withProof.nextStep, 'explain')
 assert.equal(fs.existsSync(path.join(folder, 'proof.lean')), false)
 assert.equal(fs.readFileSync(path.join(folder, 'solution', 'proof.lean'), 'utf8'), proofSource)
@@ -147,8 +147,8 @@ assert.equal(fs.readFileSync(path.join(legacyDir, 'problem', 'lean-toolchain'), 
 assert.equal(fs.readFileSync(path.join(legacyDir, 'solution', 'lean-toolchain'), 'utf8'), 'leanprover/lean4:v4.31.0\n')
 assert.equal(fs.existsSync(path.join(legacyDir, 'lean', 'stub.lean')), false)
 assert.equal(fs.existsSync(path.join(legacyDir, 'lean', 'proof.lean')), false)
-assert.equal(legacy.files.find((file) => file.key === 'leanStub')?.state, 'current')
-assert.equal(legacy.files.find((file) => file.key === 'leanProof')?.state, 'current')
+assert.equal(legacy.files.find((file) => file.key === 'leanStub')?.state, 'completed')
+assert.equal(legacy.files.find((file) => file.key === 'leanProof')?.state, 'completed')
 deleteProblem(legacy.id)
 
 const solutionDir = path.join(root, 'Old solution')
@@ -159,8 +159,8 @@ const renamed = (await import('../src/main/workspace')).openProblemFolder(soluti
 assert.equal(fs.readFileSync(path.join(solutionDir, 'solution.tex'), 'utf8'), 'old\n')
 assert.equal(fs.existsSync(path.join(solutionDir, 'readable.tex')), false)
 assert.equal(fs.existsSync(path.join(solutionDir, 'writeup.pdf')), false)
-assert.equal(renamed.files.find((file) => file.key === 'solutionTex')?.state, 'current')
-assert.equal(renamed.files.find((file) => file.key === 'solutionPdf')?.state, 'current')
+assert.equal(renamed.files.find((file) => file.key === 'solutionTex')?.state, 'completed')
+assert.equal(renamed.files.find((file) => file.key === 'solutionPdf')?.state, 'completed')
 deleteProblem(renamed.id)
 
 const removable = path.join(root, 'Empty problem')
