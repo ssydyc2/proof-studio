@@ -17,7 +17,7 @@ import type { ToolStatus } from '../../shared/toolchain'
 const ACCEPTED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const STATE_LABEL = {
   empty: 'Empty',
-  current: 'Current',
+  current: 'Completed',
   stale: 'Stale',
   failed: 'Failed'
 } as const
