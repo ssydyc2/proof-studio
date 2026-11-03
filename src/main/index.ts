@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron'
 import path from 'node:path'
 import { compileTex } from './latex'
-import { formalizeProblem, hasApiKey, proveProblem, setApiKey, transcribeProblem } from './muse'
+import { explainProblem, formalizeProblem, hasApiKey, proveProblem, setApiKey, transcribeProblem } from './muse'
 import { installUrl, toolchainStatus } from './toolchain'
 import { addSource, deleteProblem, listProblems, openProblemFolder, readFile, writeProblemText } from './workspace'
 import { PROBLEM_FILES, type FileKey, type TexSourceKey } from '../shared/problem'
@@ -83,6 +83,12 @@ function registerIpc(): void {
   ipcMain.handle('problems:prove', async (event, id: string, attempts: number) => {
     await proveProblem(id, attempts, (progress) => {
       event.sender.send('prove:progress', progress)
+    })
+    return listProblems()
+  })
+  ipcMain.handle('problems:explain', async (event, id: string) => {
+    await explainProblem(id, (progress) => {
+      event.sender.send('explain:progress', progress)
     })
     return listProblems()
   })

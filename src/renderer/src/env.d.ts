@@ -1,3 +1,4 @@
+import type { ExplainProgress } from '../../shared/explain'
 import type { FormalizeProgress } from '../../shared/formalize'
 import type { ProveProgress } from '../../shared/prove'
 import type { FileContent, FileKey, ProblemSummary, TexSourceKey } from '../../shared/problem'
@@ -17,6 +18,8 @@ export interface ProofStudioApi {
   onFormalizeProgress: (listener: (progress: FormalizeProgress) => void) => () => void
   prove: (id: string, attempts: number) => Promise<ProblemSummary[]>
   onProveProgress: (listener: (progress: ProveProgress) => void) => () => void
+  explain: (id: string) => Promise<ProblemSummary[]>
+  onExplainProgress: (listener: (progress: ExplainProgress) => void) => () => void
   compilePdf: (id: string, sourceKey: TexSourceKey) => Promise<ProblemSummary[]>
   toolchainStatus: () => Promise<ToolStatus[]>
   openInstall: (id: ToolId) => Promise<void>

@@ -226,6 +226,19 @@ export function writeLeanProof(id: string, text: string): ProblemSummary {
   return summarize(dir, meta)
 }
 
+export function writeSolutionText(id: string, text: string): ProblemSummary {
+  const dir = problemDir(id)
+  const meta = requireMeta(dir)
+  fs.writeFileSync(path.join(dir, 'solution.tex'), text)
+  meta.updatedAt = new Date().toISOString()
+  if (meta.errors?.solutionTex) {
+    delete meta.errors.solutionTex
+    if (Object.keys(meta.errors).length === 0) delete meta.errors
+  }
+  writeMeta(dir, meta)
+  return summarize(dir, meta)
+}
+
 export function recordProblemError(id: string, key: FileKey, message: string): void {
   const dir = problemDir(id)
   const meta = requireMeta(dir)
