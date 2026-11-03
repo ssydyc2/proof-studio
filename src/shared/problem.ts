@@ -7,8 +7,8 @@ export const PROBLEM_FILES = [
   { key: 'problemPdf', filename: 'problem.pdf', label: 'Problem PDF' },
   { key: 'leanStub', filename: 'problem/stub.lean', label: 'Lean stub' },
   { key: 'leanProof', filename: 'solution/proof.lean', label: 'Lean proof' },
-  { key: 'readable', filename: 'readable.tex', label: 'Readable proof' },
-  { key: 'readablePdf', filename: 'readable.pdf', label: 'Readable PDF' }
+  { key: 'solutionTex', filename: 'solution.tex', label: 'Solution TeX' },
+  { key: 'solutionPdf', filename: 'solution.pdf', label: 'Solution PDF' }
 ] as const
 
 export type FileKey = (typeof PROBLEM_FILES)[number]['key']
@@ -48,7 +48,7 @@ export type FileContent =
   | { kind: 'text'; text: string; filename: string }
   | { kind: 'empty'; filename: string; error?: string }
 
-export type TexSourceKey = 'problemText' | 'readable'
+export type TexSourceKey = 'problemText' | 'solutionTex'
 
 export type ProblemMeta = {
   id: string
@@ -65,8 +65,8 @@ const UPSTREAM: Record<FileKey, FileKey | null> = {
   problemPdf: 'problemText',
   leanStub: 'problemText',
   leanProof: 'leanStub',
-  readable: 'leanProof',
-  readablePdf: 'readable'
+  solutionTex: 'leanProof',
+  solutionPdf: 'solutionTex'
 }
 
 export const STEP_LABEL: Record<NextStep, string> = {
@@ -121,14 +121,14 @@ export function nextStep(files: ProblemFileView[]): NextStep | null {
   const problemText = byKey.get('problemText')
   const leanStub = byKey.get('leanStub')
   const leanProof = byKey.get('leanProof')
-  const readable = byKey.get('readable')
-  if (!source || !problemText || !leanStub || !leanProof || !readable) return 'add-screenshot'
+  const solutionTex = byKey.get('solutionTex')
+  if (!source || !problemText || !leanStub || !leanProof || !solutionTex) return 'add-screenshot'
 
   if (source.state === 'empty' || source.state === 'failed') return 'add-screenshot'
   if (source.state === 'current' && problemText.state !== 'current') return 'transcribe'
   if (problemText.state === 'current' && leanStub.state !== 'current') return 'formalize'
   if (leanStub.state === 'current' && leanProof.state !== 'current') return 'prove'
-  if (leanProof.state === 'current' && readable.state !== 'current') return 'explain'
+  if (leanProof.state === 'current' && solutionTex.state !== 'current') return 'explain'
   return null
 }
 
@@ -154,8 +154,12 @@ export function titleFromProblemText(text: string): string {
   return plain?.slice(0, 80) || 'Untitled problem'
 }
 
-export function pdfKeyFor(source: TexSourceKey): 'problemPdf' | 'readablePdf' {
-  return source === 'problemText' ? 'problemPdf' : 'readablePdf'
+export function pdfKeyFor(source: TexSourceKey): 'problemPdf' | 'solutionPdf' {
+  return source === 'problemText' ? 'problemPdf' : 'solutionPdf'
+}
+
+export function isListedFile(key: FileKey): boolean {
+  return key !== 'problemPdf'
 }
 
 export function fileByKey(files: ProblemFileView[], key: FileKey): ProblemFileView | undefined {

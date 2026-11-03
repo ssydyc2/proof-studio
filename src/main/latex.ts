@@ -8,28 +8,41 @@ import { clearStepError, problemDirectory, readFile, recordProblemError } from '
 
 const TEX_NAME: Record<TexSourceKey, string> = {
   problemText: 'problem.tex',
-  readable: 'readable.tex'
+  solutionTex: 'solution.tex'
 }
 
-export async function compileTex(id: string, sourceKey: TexSourceKey): Promise<void> {
+const chains = new Map<string, Promise<void>>()
+
+export function compileTex(id: string, sourceKey: TexSourceKey): Promise<void> {
+  const key = `${id}\n${sourceKey}`
+  const previous = chains.get(key) ?? Promise.resolve()
+  const run = previous.catch(() => undefined).then(() => compileTexOnce(id, sourceKey))
+  chains.set(key, run)
+  void run.finally(() => {
+    if (chains.get(key) === run) chains.delete(key)
+  }).catch(() => undefined)
+  return run
+}
+
+async function compileTexOnce(id: string, sourceKey: TexSourceKey): Promise<void> {
   const texName = TEX_NAME[sourceKey]
   const pdfKey = pdfKeyFor(sourceKey)
   const dir = problemDirectory(id)
   if (!fs.existsSync(path.join(dir, texName))) {
-    throw new Error(sourceKey === 'problemText' ? 'No problem text yet.' : 'No readable proof yet.')
+    throw new Error(sourceKey === 'problemText' ? 'No problem text yet.' : 'No solution TeX yet.')
   }
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'proof-studio-'))
   try {
     const { code, output } = await runPdflatex(texName, dir, tmp)
     const produced = path.join(tmp, texName.replace(/\.tex$/, '.pdf'))
-    if (code !== 0 || !fs.existsSync(produced)) {
-      const message = latexMessage(output)
-      if (readFile(id, pdfKey).kind !== 'pdf') recordProblemError(id, pdfKey, message)
-      throw new Error(message)
-    }
+    if (code !== 0 || !fs.existsSync(produced)) throw new Error(latexMessage(output))
     fs.copyFileSync(produced, path.join(dir, path.basename(produced)))
     clearStepError(id, pdfKey)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'pdflatex failed.'
+    if (readFile(id, pdfKey).kind !== 'pdf') recordProblemError(id, pdfKey, message)
+    throw error instanceof Error ? error : new Error(message)
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true })
   }

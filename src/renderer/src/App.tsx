@@ -3,6 +3,7 @@ import type { FormalizeProgress, FormalizeRound } from '../../shared/formalize'
 import { PROOF_ATTEMPTS, PROOF_ATTEMPT_MAX, proofAttemptCount, type ProveProgress, type ProveRound } from '../../shared/prove'
 import {
   fileByKey,
+  isListedFile,
   pdfKeyFor,
   type FileContent,
   type FileKey,
@@ -20,7 +21,7 @@ const STATE_LABEL = {
   failed: 'Failed'
 } as const
 
-type PairAction = 'generate-tex' | 'generate-pdf' | 'generate-lean' | 'generate-proof' | 'unavailable'
+type PairAction = 'generate-tex' | 'generate-pdf' | 'generate-lean' | 'generate-proof' | 'none' | 'unavailable'
 
 type Busy = 'transcribe' | 'pdf' | 'formalize' | 'prove' | null
 
@@ -56,6 +57,8 @@ export function App() {
   const [tools, setTools] = useState<ToolStatus[] | null>(null)
   const [checkingTools, setCheckingTools] = useState(false)
   const loaded = useRef('')
+  const loadedId = useRef('')
+  const saveGen = useRef(0)
   const fileInput = useRef<HTMLInputElement>(null)
   const pendingAfterKey = useRef<'transcribe' | 'formalize' | 'prove' | null>(null)
 
@@ -101,8 +104,11 @@ export function App() {
       setRightContent(right)
       const tex = pair.left === 'problemText' ? left : pair.right === 'problemText' ? right : null
       if (tex?.kind === 'text') {
+        const sameProblem = loadedId.current === selectedId
+        const previous = loaded.current
         loaded.current = tex.text
-        setDraft(tex.text)
+        loadedId.current = selectedId
+        setDraft((current) => (!sameProblem || current === previous || current === tex.text ? tex.text : current))
       }
     })
     return () => {
@@ -115,13 +121,28 @@ export function App() {
     const id = selectedId
     const text = draft
     const timer = window.setTimeout(() => {
+      const gen = ++saveGen.current
       void window.proofStudio
         .writeText(id, text)
-        .then((nextProblems) => {
+        .then(async (nextProblems) => {
+          if (saveGen.current !== gen) return
           loaded.current = text
           setProblems(nextProblems)
+          const compiled = await window.proofStudio.compilePdf(id, 'problemText')
+          if (saveGen.current !== gen) return
+          setProblems(compiled)
+          setError(null)
+          setLoadTick((tick) => tick + 1)
         })
-        .catch((cause: unknown) => setError(messageOf(cause)))
+        .catch((cause: unknown) => {
+          if (saveGen.current !== gen) return
+          setError(messageOf(cause))
+          void window.proofStudio.listProblems().then((nextProblems) => {
+            if (saveGen.current !== gen) return
+            setProblems(nextProblems)
+            setLoadTick((tick) => tick + 1)
+          })
+        })
     }, 400)
     return () => window.clearTimeout(timer)
   }, [draft, selectedId, showsTex])
@@ -195,16 +216,20 @@ export function App() {
   }
 
   async function transcribe(id: string) {
+    ++saveGen.current
     setBusy('transcribe')
     setError(null)
     try {
       const nextProblems = await window.proofStudio.transcribe(id)
       setProblems(nextProblems)
-      setSelectedFile('problemPdf')
       setLoadTick((tick) => tick + 1)
     } catch (cause) {
       setError(messageOf(cause))
-      setProblems(await window.proofStudio.listProblems())
+      const nextProblems = await window.proofStudio.listProblems()
+      setProblems(nextProblems)
+      const tex = fileByKey(nextProblems.find((problem) => problem.id === id)?.files ?? [], 'problemText')
+      if (tex && tex.state !== 'empty') setSelectedFile('problemText')
+      setLoadTick((tick) => tick + 1)
     } finally {
       setBusy(null)
     }
@@ -391,7 +416,7 @@ export function App() {
               </div>
               {problem.id === selectedId && pair && (
                 <div className="files">
-                  {problem.files.map((item) => (
+                  {problem.files.filter((item) => isListedFile(item.key)).map((item) => (
                     <button
                       key={item.key}
                       type="button"
@@ -769,10 +794,10 @@ function StatusLog(props: {
 function pairFor(key: FileKey, files: ProblemFileView[]): FilePair {
   const tex = fileByKey(files, 'problemText')
   const texReady = Boolean(tex && tex.state !== 'empty' && tex.state !== 'failed')
-  if (key === 'source' || (key === 'problemText' && !texReady)) {
+  if (key === 'source' || ((key === 'problemText' || key === 'problemPdf') && !texReady)) {
     return {
       left: 'source',
-      right: 'problemText',
+      right: 'problemPdf',
       title: 'Screenshot to TeX',
       action: 'generate-tex',
       label: 'Generate TeX problem',
@@ -783,11 +808,10 @@ function pairFor(key: FileKey, files: ProblemFileView[]): FilePair {
     return {
       left: 'problemText',
       right: 'problemPdf',
-      title: 'TeX to PDF',
-      action: 'generate-pdf',
-      label: 'Generate PDF',
-      busyLabel: 'Generating PDF…',
-      texKey: 'problemText'
+      title: 'Problem TeX',
+      action: 'none',
+      label: '',
+      busyLabel: ''
     }
   }
   if (key === 'leanStub') {
@@ -810,24 +834,24 @@ function pairFor(key: FileKey, files: ProblemFileView[]): FilePair {
       busyLabel: 'Generating Lean proof…'
     }
   }
-  if (key === 'readable') {
+  if (key === 'solutionTex') {
     return {
       left: 'leanProof',
-      right: 'readable',
-      title: 'Proof to readable TeX',
+      right: 'solutionTex',
+      title: 'Lean to solution TeX',
       action: 'unavailable',
-      label: 'Generate readable proof',
-      busyLabel: 'Generate readable proof'
+      label: 'Generate solution TeX',
+      busyLabel: 'Generate solution TeX'
     }
   }
   return {
-    left: 'readable',
-    right: 'readablePdf',
-    title: 'Readable TeX to PDF',
+    left: 'leanProof',
+    right: 'solutionPdf',
+    title: 'Lean and solution PDF',
     action: 'generate-pdf',
     label: 'Generate PDF',
     busyLabel: 'Generating PDF…',
-    texKey: 'readable'
+    texKey: 'solutionTex'
   }
 }
 
@@ -837,7 +861,8 @@ function actionFor(
   busy: Busy,
   progress: FormalizeProgress | null,
   proveProgress: ProveProgress | null
-): { label: string; enabled: boolean } {
+): { label: string; enabled: boolean } | null {
+  if (pair.action === 'none') return null
   if (pair.action === 'unavailable') return { label: pair.label, enabled: false }
   if (pair.action === 'generate-tex') {
     const source = fileByKey(files, 'source')
@@ -894,15 +919,15 @@ function emptyCopy(key: FileKey): string {
     case 'problemText':
       return 'problem.tex is created when you generate the TeX problem from the screenshot.'
     case 'problemPdf':
-      return 'problem.pdf is created when you generate a PDF from problem.tex.'
+      return 'This PDF is compiled when the TeX problem is generated.'
     case 'leanStub':
       return 'stub.lean is created from problem.tex and saved in the problem folder, with its own Lean project. Muse writes two Lean statements of the problem. Each proof is sorry, and Lake checks the file against Mathlib.'
     case 'leanProof':
       return 'proof.lean is written into the solution folder, separate from the problem project. Muse proves one statement from stub.lean. Set how many attempts each statement gets. If the first compiles, the second is left alone.'
-    case 'readable':
-      return 'Generate readable proof is not available in this version.'
-    case 'readablePdf':
-      return 'This PDF is created from readable.tex.'
+    case 'solutionTex':
+      return 'Generate solution TeX is not available in this version.'
+    case 'solutionPdf':
+      return 'solution.pdf is compiled from solution.tex and shown beside the Lean proof.'
   }
 }
 
