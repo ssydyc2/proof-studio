@@ -18,24 +18,24 @@ export async function proveSource(options: {
   for (let index = 0; index < statements.length; index++) {
     const statement = statements[index]
     const number = index + 1
-    let previous: { source: string; output: string } | null = null
+    const history: { source: string; output: string }[] = []
     for (let attempt = 1; attempt <= attempts; attempt++) {
       options.onAttempt?.(number, attempt)
-      const raw = await options.ask(provePrompt(options.toolchain, statement, previous))
+      const raw = await options.ask(provePrompt(options.toolchain, statement, history))
       const source = extractLean(raw)
       const report = (ok: boolean, detail: string) => {
         options.onRound?.({ statement: number, attempt, ok, returned: oneLine(source), detail })
       }
       if (!source) {
         lastOutput = 'The Lean file was empty.'
-        previous = { source: '', output: lastOutput }
+        history.push({ source: '', output: lastOutput })
         report(false, lastOutput)
         continue
       }
       const shape = proofError(source, statement)
       if (shape) {
         lastOutput = shape
-        previous = { source, output: shape }
+        history.push({ source, output: shape })
         report(false, shape)
         continue
       }
@@ -45,7 +45,7 @@ export async function proveSource(options: {
         return source
       }
       lastOutput = result.output
-      previous = { source, output: result.output }
+      history.push({ source, output: result.output })
       report(false, compilerFeedback(result.output))
     }
     const attemptWord = attempts === 1 ? 'attempt' : 'attempts'
@@ -85,7 +85,7 @@ export function proofError(source: string, statement: { name: string; file: stri
 function provePrompt(
   toolchain: string,
   statement: { name: string; file: string },
-  previous: { source: string; output: string } | null
+  history: { source: string; output: string }[]
 ): string {
   const version = toolchain.replace('leanprover/lean4:', '')
   const task = `Prove this one Lean 4 theorem for ${toolchain} with Mathlib ${version}.
@@ -96,10 +96,12 @@ function provePrompt(
 - Replace sorry with a complete proof. Do not use sorry or an axiom.
 - Output only Lean source.`
   const parts = [task, `Statement:\n${statement.file.trim()}`]
-  if (previous) {
-    parts.push(
-      `This attempt failed. Prove ${statement.name} again.\n\nLatest reply:\n${cap(previous.source) || '(empty)'}\n\nFeedback:\n${compilerFeedback(previous.output)}`
+  if (history.length > 0) {
+    const records = history.map(
+      (item, index) =>
+        `Attempt ${index + 1}:\nReply:\n${cap(item.source) || '(empty)'}\n\nFeedback:\n${compilerFeedback(item.output)}`
     )
+    parts.push(`Earlier attempts failed. Prove ${statement.name} again. Do not repeat these errors.\n\n${records.join('\n\n')}`)
   }
   return parts.join('\n\n')
 }

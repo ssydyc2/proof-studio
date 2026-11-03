@@ -346,7 +346,9 @@ const secondProof = await proveSource({
   ask: async (prompt) => {
     secondPrompts.push(prompt)
     secondAsks += 1
-    if (secondAsks <= 3) return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
+    if (secondAsks === 1) return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
+    if (secondAsks === 2) return 'theorem statement1 : Nat.Prime 2 := by\n  exact False'
+    if (secondAsks === 3) return 'theorem statement1 : Nat.Prime 2 := by\n  exact Nat'
     return proved2
   },
   compile: async (source) => {
@@ -358,7 +360,13 @@ assert.equal(secondAsks, 4)
 assert.equal(secondProof, proved2.trim())
 assert.match(secondPrompts[0], /theorem statement1/)
 assert.doesNotMatch(secondPrompts[0], /theorem statement2/)
+assert.match(secondPrompts[1], /exact True/)
+assert.doesNotMatch(secondPrompts[1], /exact False/)
 assert.match(secondPrompts[2], /Prove statement1 again/)
+assert.match(secondPrompts[2], /Attempt 1/)
+assert.match(secondPrompts[2], /exact True/)
+assert.match(secondPrompts[2], /Attempt 2/)
+assert.match(secondPrompts[2], /exact False/)
 assert.match(secondPrompts[3], /theorem statement2/)
 assert.doesNotMatch(secondPrompts[3], /theorem statement1/)
 assert.doesNotMatch(secondPrompts[3], /This attempt failed/)
