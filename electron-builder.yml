@@ -1,0 +1,14 @@
+appId: com.ssydyc2.proofstudio
+productName: ProofStudio
+directories:
+  output: dist
+  buildResources: build
+files:
+  - package.json
+  - out/**/*
+mac:
+  category: public.app-category.education
+  icon: build/icon.png
+  identity: null
+  target:
+    - dir

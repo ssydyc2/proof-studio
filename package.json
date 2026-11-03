@@ -1,12 +1,14 @@
 {
   "name": "proof-studio",
   "version": "0.1.0",
+  "description": "macOS app for mathematical proof",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "app": "electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "check": "tsx scripts/check-workspace.ts",
     "seed:sample": "tsx scripts/seed-sample.ts"
@@ -22,6 +24,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
