@@ -1,6 +1,7 @@
 import type { ExplainProgress } from '../../shared/explain'
 import type { FormalizeProgress } from '../../shared/formalize'
 import type { ProveProgress } from '../../shared/prove'
+import type { LeanRange } from '../../shared/locate'
 import type { FileContent, FileKey, ProblemSummary, TexSourceKey } from '../../shared/problem'
 import type { ToolId, ToolStatus } from '../../shared/toolchain'
 
@@ -21,6 +22,7 @@ export interface ProofStudioApi {
   explain: (id: string) => Promise<ProblemSummary[]>
   onExplainProgress: (listener: (progress: ExplainProgress) => void) => () => void
   compilePdf: (id: string, sourceKey: TexSourceKey) => Promise<ProblemSummary[]>
+  locateLean: (id: string, passage: string) => Promise<LeanRange[]>
   toolchainStatus: () => Promise<ToolStatus[]>
   openInstall: (id: ToolId) => Promise<void>
 }

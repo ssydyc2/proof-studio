@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ExplainProgress, ExplainRound } from '../../shared/explain'
+import { leanLines, type LeanRange } from '../../shared/locate'
 import type { FormalizeProgress, FormalizeRound } from '../../shared/formalize'
 import { PROOF_ATTEMPTS, PROOF_ATTEMPT_MAX, proofAttemptCount, type ProveProgress, type ProveRound } from '../../shared/prove'
 import {
@@ -13,6 +14,7 @@ import {
   type TexSourceKey
 } from '../../shared/problem'
 import type { ToolStatus } from '../../shared/toolchain'
+import { PdfView } from './PdfView'
 
 const ACCEPTED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const STATE_LABEL = {
@@ -59,12 +61,18 @@ export function App() {
   const [loadTick, setLoadTick] = useState(0)
   const [tools, setTools] = useState<ToolStatus[] | null>(null)
   const [checkingTools, setCheckingTools] = useState(false)
+  const [leanRanges, setLeanRanges] = useState<LeanRange[]>([])
+  const [locating, setLocating] = useState(false)
   const loaded = useRef('')
   const loadedId = useRef('')
   const saveGen = useRef(0)
+  const locateGen = useRef(0)
+  const selectedIdRef = useRef<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
-  const pendingAfterKey = useRef<'transcribe' | 'formalize' | 'prove' | 'explain' | null>(null)
+  const pendingAfterKey = useRef<'transcribe' | 'formalize' | 'prove' | 'explain' | 'locate' | null>(null)
+  const pendingPassage = useRef('')
 
+  selectedIdRef.current = selectedId
   const selected = problems.find((problem) => problem.id === selectedId) ?? null
   const pair = selected ? pairFor(selectedFile, selected.files) : null
   const showsTex = pair?.left === 'problemText' || pair?.right === 'problemText'
@@ -123,6 +131,10 @@ export function App() {
       cancelled = true
     }
   }, [selectedId, pair?.left, pair?.right, loadTick])
+
+  useEffect(() => {
+    setLeanRanges([])
+  }, [selectedId, loadTick])
 
   useEffect(() => {
     if (!selectedId || !showsTex || draft === loaded.current) return
@@ -326,8 +338,35 @@ export function App() {
       if (pending === 'formalize' && selected) await formalize(selected.id)
       if (pending === 'prove' && selected) await prove(selected.id)
       if (pending === 'explain' && selected) await explain(selected.id)
+      if (pending === 'locate' && selected && pendingPassage.current) await locate(pendingPassage.current)
     } catch (cause) {
       setError(messageOf(cause))
+    }
+  }
+
+  async function locate(passage: string) {
+    if (!selected || locating) return
+    const text = passage.trim()
+    if (!text) return
+    if (!(await window.proofStudio.hasApiKey())) {
+      pendingPassage.current = text
+      pendingAfterKey.current = 'locate'
+      setKeyOpen(true)
+      return
+    }
+    const id = selected.id
+    const request = ++locateGen.current
+    setLocating(true)
+    setError(null)
+    try {
+      const ranges = await window.proofStudio.locateLean(id, text)
+      if (locateGen.current !== request || selectedIdRef.current !== id) return
+      setLeanRanges(ranges)
+    } catch (cause) {
+      if (locateGen.current !== request) return
+      setError(messageOf(cause))
+    } finally {
+      if (locateGen.current === request) setLocating(false)
     }
   }
 
@@ -615,6 +654,12 @@ export function App() {
             }))}
           />
         )}
+        {locating && (
+          <p className="banner info">
+            <Icon name="sparkle" size={15} />
+            Finding the Lean lines…
+          </p>
+        )}
         {error && (
           <p className="banner" role="alert">
             <Icon name="alert" size={15} />
@@ -629,6 +674,7 @@ export function App() {
               draft={draft}
               onDraft={setDraft}
               onAddScreenshot={() => fileInput.current?.click()}
+              ranges={pair.right === 'solutionPdf' ? leanRanges : undefined}
             />
             <Pane
               file={fileByKey(selected.files, pair.right)}
@@ -636,6 +682,7 @@ export function App() {
               draft={draft}
               onDraft={setDraft}
               onAddScreenshot={() => fileInput.current?.click()}
+              onLeanComponent={pair.right === 'solutionPdf' ? (text) => void locate(text) : undefined}
             />
           </div>
         ) : (
@@ -720,13 +767,17 @@ function Pane({
   content,
   draft,
   onDraft,
-  onAddScreenshot
+  onAddScreenshot,
+  ranges,
+  onLeanComponent
 }: {
   file: ProblemFileView | undefined
   content: FileContent | null
   draft: string
   onDraft: (value: string) => void
   onAddScreenshot: () => void
+  ranges?: LeanRange[]
+  onLeanComponent?: (text: string) => void
 }) {
   if (!file) return null
   const editable = file.key === 'problemText' && content?.kind === 'text'
@@ -741,7 +792,12 @@ function Pane({
       </header>
       <div className="pane-body">
         {content?.kind === 'image' && <img className="preview" src={content.dataUrl} alt="Problem screenshot" />}
-        {content?.kind === 'pdf' && <embed className="pdf" type="application/pdf" src={content.dataUrl} />}
+        {content?.kind === 'pdf' &&
+          (onLeanComponent ? (
+            <PdfView dataUrl={content.dataUrl} onLeanComponent={onLeanComponent} />
+          ) : (
+            <embed className="pdf" type="application/pdf" src={content.dataUrl} />
+          ))}
         {editable && (
           <textarea
             className="editor"
@@ -751,7 +807,8 @@ function Pane({
             onChange={(event) => onDraft(event.target.value)}
           />
         )}
-        {content?.kind === 'text' && !editable && <pre className="editor readonly">{content.text}</pre>}
+        {content?.kind === 'text' && !editable && ranges && <LeanCode text={content.text} ranges={ranges} />}
+        {content?.kind === 'text' && !editable && !ranges && <pre className="editor readonly">{content.text}</pre>}
         {content?.kind === 'empty' && (
           <div
             className={file.key === 'source' ? 'empty droppable' : 'empty'}
@@ -809,6 +866,31 @@ function Icon({ name, size = 16 }: { name: keyof typeof ICONS; size?: number }) 
     >
       <path d={ICONS[name]} />
     </svg>
+  )
+}
+
+function LeanCode({ text, ranges }: { text: string; ranges: LeanRange[] }) {
+  const view = useRef<HTMLDivElement>(null)
+  const mark = ranges.map((range) => `${range.start}-${range.end}`).join(',')
+  useEffect(() => {
+    const first = ranges[0]?.start
+    if (!first) return
+    view.current?.querySelector(`[data-line="${first}"]`)?.scrollIntoView({ block: 'center' })
+  }, [mark, ranges])
+  const lines = leanLines(text)
+  return (
+    <div className="lean-code" ref={view}>
+      {lines.map((line, index) => {
+        const number = index + 1
+        const hit = ranges.some((range) => number >= range.start && number <= range.end)
+        return (
+          <div key={number} className={hit ? 'lean-line hit' : 'lean-line'} data-line={number}>
+            <span className="lean-no">{number}</span>
+            <code>{line || ' '}</code>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

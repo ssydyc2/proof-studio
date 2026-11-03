@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron'
 import path from 'node:path'
 import { compileTex } from './latex'
-import { explainProblem, formalizeProblem, hasApiKey, proveProblem, setApiKey, transcribeProblem } from './muse'
+import { explainProblem, formalizeProblem, hasApiKey, locateLean, proveProblem, setApiKey, transcribeProblem } from './muse'
 import { installUrl, toolchainStatus } from './toolchain'
 import { addSource, deleteProblem, listProblems, openProblemFolder, readFile, writeProblemText } from './workspace'
 import { PROBLEM_FILES, type FileKey, type TexSourceKey } from '../shared/problem'
@@ -91,6 +91,10 @@ function registerIpc(): void {
       event.sender.send('explain:progress', progress)
     })
     return listProblems()
+  })
+  ipcMain.handle('problems:locate-lean', async (_event, id: string, passage: string) => {
+    if (typeof id !== 'string' || typeof passage !== 'string') throw new Error('Unknown file.')
+    return locateLean(id, passage)
   })
   ipcMain.handle('problems:compile', async (_event, id: string, sourceKey: TexSourceKey) => {
     if (sourceKey !== 'problemText' && sourceKey !== 'solutionTex') throw new Error('Unknown file.')
