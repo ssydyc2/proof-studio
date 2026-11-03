@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { FileContent, FileKey, ProblemSummary, TexSourceKey } from '../shared/problem'
+import type { ToolId, ToolStatus } from '../shared/toolchain'
 
 const api = {
   listProblems: (): Promise<ProblemSummary[]> => ipcRenderer.invoke('problems:list'),
@@ -15,7 +16,9 @@ const api = {
   setApiKey: (key: string): Promise<void> => ipcRenderer.invoke('api-key:set', key),
   transcribe: (id: string): Promise<ProblemSummary[]> => ipcRenderer.invoke('problems:transcribe', id),
   compilePdf: (id: string, sourceKey: TexSourceKey): Promise<ProblemSummary[]> =>
-    ipcRenderer.invoke('problems:compile', id, sourceKey)
+    ipcRenderer.invoke('problems:compile', id, sourceKey),
+  toolchainStatus: (): Promise<ToolStatus[]> => ipcRenderer.invoke('environment:status'),
+  openInstall: (id: ToolId): Promise<void> => ipcRenderer.invoke('environment:open', id)
 }
 
 export type ProofStudioApi = typeof api

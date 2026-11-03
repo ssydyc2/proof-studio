@@ -3,9 +3,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { pdfKeyFor, type TexSourceKey } from '../shared/problem'
+import { pdflatexCommand } from './toolchain'
 import { clearStepError, problemDirectory, readFile, recordProblemError } from './workspace'
-
-const TEXBIN = '/Library/TeX/texbin'
 
 const TEX_NAME: Record<TexSourceKey, string> = {
   problemText: 'problem.tex',
@@ -36,12 +35,6 @@ export async function compileTex(id: string, sourceKey: TexSourceKey): Promise<v
   }
 }
 
-function pdflatexBin(): string {
-  const direct = path.join(TEXBIN, 'pdflatex')
-  if (fs.existsSync(direct)) return direct
-  throw new Error('pdflatex was not found. Install MacTeX and try again.')
-}
-
 function latexMessage(output: string): string {
   const line = output.split('\n').find((item) => item.startsWith('!') || /:\d+:/.test(item))
   const text = (line ?? 'pdflatex failed.').replace(/^!\s*/, '').trim()
@@ -49,7 +42,7 @@ function latexMessage(output: string): string {
 }
 
 function runPdflatex(texName: string, cwd: string, outputDirectory: string): Promise<{ code: number; output: string }> {
-  const bin = pdflatexBin()
+  const bin = pdflatexCommand()
   return new Promise((resolve, reject) => {
     const child = spawn(
       bin,
@@ -58,7 +51,7 @@ function runPdflatex(texName: string, cwd: string, outputDirectory: string): Pro
         cwd,
         env: {
           ...process.env,
-          PATH: `${TEXBIN}${path.delimiter}${process.env.PATH ?? ''}`
+          PATH: `${path.dirname(bin)}${path.delimiter}/Library/TeX/texbin${path.delimiter}${process.env.PATH ?? ''}`
         }
       }
     )
