@@ -8,49 +8,89 @@ export async function proveSource(options: {
   ask: (prompt: string) => Promise<string>
   compile: (source: string) => Promise<LeanCompileResult>
   onAttempt?: (statement: number, attempt: number) => void
+  onRunning?: (running: { statement: number; attempt: number }[]) => void
   onRound?: (round: ProveRound) => void
 }): Promise<string> {
   const attempts = proofAttemptCount(options.attempts ?? PROOF_ATTEMPTS)
   const statements = statementsOf(options.stub)
   if (statements.length === 0) throw new Error('The Lean stub has no statement to prove.')
   let lastOutput = 'lean failed.'
+  let winner: string | null = null
+  let compileChain = Promise.resolve()
   const failures: string[] = []
-  for (let index = 0; index < statements.length; index++) {
-    const statement = statements[index]
-    const number = index + 1
-    const history: { source: string; output: string }[] = []
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      options.onAttempt?.(number, attempt)
-      const raw = await options.ask(provePrompt(options.toolchain, statement, history))
-      const source = extractLean(raw)
-      const report = (ok: boolean, detail: string) => {
-        options.onRound?.({ statement: number, attempt, ok, returned: oneLine(source), detail })
-      }
-      if (!source) {
-        lastOutput = 'The Lean file was empty.'
-        history.push({ source: '', output: lastOutput })
-        report(false, lastOutput)
-        continue
-      }
-      const shape = proofError(source, statement)
-      if (shape) {
-        lastOutput = shape
-        history.push({ source, output: shape })
-        report(false, shape)
-        continue
-      }
+  const active = new Map<number, number>()
+  const publishActive = () => {
+    const running = [...active.entries()]
+      .map(([statement, attempt]) => ({ statement, attempt }))
+      .sort((left, right) => left.statement - right.statement)
+    options.onRunning?.(running)
+  }
+  const compileIfOpen = (source: string) => {
+    const run = compileChain.then(async () => {
+      if (winner != null) return null
       const result = await options.compile(source)
       if (result.ok) {
-        report(true, 'Compiled.')
-        return source
+        if (winner != null) return null
+        winner = source
       }
-      lastOutput = result.output
-      history.push({ source, output: result.output })
-      report(false, compilerFeedback(result.output))
-    }
-    const attemptWord = attempts === 1 ? 'attempt' : 'attempts'
-    failures.push(`${statement.name} failed after ${attempts} ${attemptWord}`)
+      return result
+    })
+    compileChain = run.then(
+      () => undefined,
+      () => undefined
+    )
+    return run
   }
+
+  async function proveStatement(statement: { name: string; file: string }, number: number): Promise<void> {
+    const history: { source: string; output: string }[] = []
+    try {
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        if (winner != null) return
+        active.set(number, attempt)
+        publishActive()
+        options.onAttempt?.(number, attempt)
+        const raw = await options.ask(provePrompt(options.toolchain, statement, history))
+        if (winner != null) return
+        const source = extractLean(raw)
+        const report = (ok: boolean, detail: string) => {
+          options.onRound?.({ statement: number, attempt, ok, returned: oneLine(source), detail })
+        }
+        if (!source) {
+          lastOutput = 'The Lean file was empty.'
+          history.push({ source: '', output: lastOutput })
+          report(false, lastOutput)
+          continue
+        }
+        const shape = proofError(source, statement)
+        if (shape) {
+          lastOutput = shape
+          history.push({ source, output: shape })
+          report(false, shape)
+          continue
+        }
+        const result = await compileIfOpen(source)
+        if (result == null) return
+        if (result.ok) {
+          report(true, 'Compiled.')
+          return
+        }
+        lastOutput = result.output
+        history.push({ source, output: result.output })
+        report(false, compilerFeedback(result.output))
+      }
+      if (winner != null) return
+      const attemptWord = attempts === 1 ? 'attempt' : 'attempts'
+      failures.push(`${statement.name} failed after ${attempts} ${attemptWord}`)
+    } finally {
+      active.delete(number)
+      publishActive()
+    }
+  }
+
+  await Promise.all(statements.map((statement, index) => proveStatement(statement, index + 1)))
+  if (winner) return winner
+  failures.sort((left, right) => left.localeCompare(right))
   throw new Error(`Lean did not accept a proof. ${failures.join('. ')}. ${summarizeLeanFailure(lastOutput)}`)
 }
 

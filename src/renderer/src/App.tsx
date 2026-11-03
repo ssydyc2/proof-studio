@@ -527,13 +527,7 @@ export function App() {
         )}
         {pair?.action === 'generate-proof' && (proveProgress || proveRounds.length > 0) && (
           <StatusLog
-            waiting={
-              proveProgress?.phase === 'setup'
-                ? 'Preparing Lean…'
-                : proveProgress?.phase === 'attempt'
-                  ? `Proving statement ${proveProgress.statement}, attempt ${proveProgress.attempt} of ${proveProgress.total}…`
-                  : null
-            }
+            waiting={proveActivity(proveProgress)}
             rounds={proveRounds.map((round) => ({
               key: `${round.statement}-${round.attempt}`,
               index: `${round.statement}.${round.attempt}`,
@@ -874,11 +868,19 @@ function formalizeLabel(progress: FormalizeProgress | null, fallback: string): s
 }
 
 function proveLabel(progress: ProveProgress | null, fallback: string): string {
-  if (progress?.phase === 'setup') return 'Preparing Lean…'
-  if (progress?.phase === 'attempt') {
+  return proveActivity(progress) ?? fallback
+}
+
+function proveActivity(progress: ProveProgress | null): string | null {
+  if (!progress) return null
+  if (progress.phase === 'setup') return 'Preparing Lean…'
+  const running = progress.running?.filter((item) => item.attempt > 0) ?? []
+  if (running.length === 0) {
+    if (progress.phase !== 'attempt' || progress.attempt <= 0) return null
     return `Proving statement ${progress.statement}, attempt ${progress.attempt} of ${progress.total}…`
   }
-  return fallback
+  const text = running.map((item) => `statement ${item.statement}, attempt ${item.attempt} of ${progress.total}`).join(' and ')
+  return `Proving ${text}…`
 }
 
 function fileName(problem: ProblemSummary | null, key: FileKey): string {

@@ -18,10 +18,16 @@ export type ProveRound = {
   detail: string
 }
 
+export type ProveRun = {
+  statement: number
+  attempt: number
+}
+
 export type ProveProgress = {
   phase: 'setup' | 'attempt' | 'round'
   statement: number
   attempt: number
   total: number
   rounds: ProveRound[]
+  running?: ProveRun[]
 }

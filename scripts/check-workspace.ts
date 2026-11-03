@@ -306,7 +306,11 @@ const proved1 = `import Mathlib.Data.Nat.Prime.Defs
 theorem statement1 : Nat.Prime 2 := by
   decide
 `
-let proveAsks = 0
+let releaseSecond: () => void = () => {}
+const holdSecond = new Promise<void>((resolve) => {
+  releaseSecond = resolve
+})
+let secondStarted = 0
 const provePrompts: string[] = []
 let proveCompiles = 0
 const firstProof = await proveSource({
@@ -314,62 +318,87 @@ const firstProof = await proveSource({
   toolchain: 'leanprover/lean4:v4.31.0',
   ask: async (prompt) => {
     provePrompts.push(prompt)
-    proveAsks += 1
-    if (proveAsks === 1) return split[0].file
-    return proved1
+    if (prompt.includes('Prove only statement2')) {
+      secondStarted += 1
+      await holdSecond
+      return split[1].file
+    }
+    if (prompt.includes('Earlier attempts failed')) return proved1
+    return split[0].file
   },
   compile: async (source) => {
     proveCompiles += 1
     assert.equal(source, proved1.trim())
     assert.doesNotMatch(source, /\bsorry\b/)
+    setTimeout(releaseSecond, 0)
     return { ok: true }
   }
 })
-assert.equal(proveAsks, 2)
+assert.equal(secondStarted, 1)
 assert.equal(proveCompiles, 1)
 assert.equal(firstProof, proved1.trim())
-assert.match(provePrompts[0], /Prove only statement1/)
-assert.doesNotMatch(provePrompts[0], /theorem statement2/)
-assert.match(provePrompts[1], /must not contain sorry/)
-assert.doesNotMatch(provePrompts[1], /theorem statement2/)
+const statement1Prompts = provePrompts.filter((prompt) => prompt.includes('Prove only statement1'))
+assert.equal(statement1Prompts.length, 2)
+assert.doesNotMatch(statement1Prompts[0], /theorem statement2/)
+assert.match(statement1Prompts[1], /must not contain sorry/)
+assert.doesNotMatch(statement1Prompts[1], /theorem statement2/)
 
 const proved2 = `import Mathlib.Data.Nat.Prime.Defs
 
 theorem statement2 : Nat.Prime (0 + 2) := by
   decide
 `
-let secondAsks = 0
-const secondPrompts: string[] = []
-const secondProof = await proveSource({
+const historyPrompts: string[] = []
+await assert.rejects(
+  proveSource({
+    stub: two,
+    toolchain: 'leanprover/lean4:v4.31.0',
+    ask: async (prompt) => {
+      if (prompt.includes('Prove only statement2')) return split[1].file
+      historyPrompts.push(prompt)
+      if (historyPrompts.length === 1) return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
+      if (historyPrompts.length === 2) return 'theorem statement1 : Nat.Prime 2 := by\n  exact False'
+      return 'theorem statement1 : Nat.Prime 2 := by\n  exact Nat'
+    },
+    compile: async () => ({ ok: false, output: 'stub.lean:3:2: error: type mismatch' })
+  }),
+  /statement1 failed after 3 attempts/
+)
+assert.equal(historyPrompts.length, 3)
+assert.match(historyPrompts[1], /exact True/)
+assert.doesNotMatch(historyPrompts[1], /exact False/)
+assert.match(historyPrompts[2], /Prove statement1 again/)
+assert.match(historyPrompts[2], /Attempt 1/)
+assert.match(historyPrompts[2], /exact True/)
+assert.match(historyPrompts[2], /Attempt 2/)
+assert.match(historyPrompts[2], /exact False/)
+
+let releaseFirst: () => void = () => {}
+const holdFirst = new Promise<void>((resolve) => {
+  releaseFirst = resolve
+})
+let firstStarted = 0
+const raced = await proveSource({
   stub: two,
   toolchain: 'leanprover/lean4:v4.31.0',
   ask: async (prompt) => {
-    secondPrompts.push(prompt)
-    secondAsks += 1
-    if (secondAsks === 1) return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
-    if (secondAsks === 2) return 'theorem statement1 : Nat.Prime 2 := by\n  exact False'
-    if (secondAsks === 3) return 'theorem statement1 : Nat.Prime 2 := by\n  exact Nat'
+    if (prompt.includes('Prove only statement1')) {
+      firstStarted += 1
+      await holdFirst
+      return 'theorem statement1 : Nat.Prime 2 := by\n  exact True'
+    }
     return proved2
   },
   compile: async (source) => {
-    if (source === proved2.trim()) return { ok: true }
+    if (source === proved2.trim()) {
+      setTimeout(releaseFirst, 0)
+      return { ok: true }
+    }
     return { ok: false, output: 'stub.lean:3:2: error: type mismatch' }
   }
 })
-assert.equal(secondAsks, 4)
-assert.equal(secondProof, proved2.trim())
-assert.match(secondPrompts[0], /theorem statement1/)
-assert.doesNotMatch(secondPrompts[0], /theorem statement2/)
-assert.match(secondPrompts[1], /exact True/)
-assert.doesNotMatch(secondPrompts[1], /exact False/)
-assert.match(secondPrompts[2], /Prove statement1 again/)
-assert.match(secondPrompts[2], /Attempt 1/)
-assert.match(secondPrompts[2], /exact True/)
-assert.match(secondPrompts[2], /Attempt 2/)
-assert.match(secondPrompts[2], /exact False/)
-assert.match(secondPrompts[3], /theorem statement2/)
-assert.doesNotMatch(secondPrompts[3], /theorem statement1/)
-assert.doesNotMatch(secondPrompts[3], /This attempt failed/)
+assert.equal(raced, proved2.trim())
+assert.equal(firstStarted, 1)
 
 let changedCompiles = 0
 await assert.rejects(
@@ -392,9 +421,9 @@ await assert.rejects(
   proveSource({
     stub: two,
     toolchain: 'leanprover/lean4:v4.31.0',
-    ask: async () => {
+    ask: async (prompt) => {
       bothAsks += 1
-      return bothAsks <= 3 ? split[0].file : split[1].file
+      return prompt.includes('Prove only statement2') ? split[1].file : split[0].file
     },
     compile: async () => {
       throw new Error('sorry must not be compiled')

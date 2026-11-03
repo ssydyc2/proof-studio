@@ -127,15 +127,19 @@ export async function proveProblem(
   const key = apiKey
   try {
     const rounds: ProveProgress['rounds'] = []
+    let running: ProveProgress['running'] = []
     const publish = (progress: ProveProgress) => onProgress?.(progress)
-    publish({ phase: 'setup', statement: 1, attempt: 0, total: count, rounds })
+    publish({ phase: 'setup', statement: 1, attempt: 0, total: count, rounds, running })
     const project = await prepareLean()
     const source = await proveSource({
       stub: stub.text,
       toolchain: project.toolchain,
       attempts: count,
+      onRunning: (next) => {
+        running = next
+      },
       onAttempt: (statement, attempt) =>
-        publish({ phase: 'attempt', statement, attempt, total: count, rounds: [...rounds] }),
+        publish({ phase: 'attempt', statement, attempt, total: count, rounds: [...rounds], running: [...(running ?? [])] }),
       onRound: (round) => {
         rounds.push(round)
         publish({
@@ -143,7 +147,8 @@ export async function proveProblem(
           statement: round.statement,
           attempt: round.attempt,
           total: count,
-          rounds: [...rounds]
+          rounds: [...rounds],
+          running: [...(running ?? [])]
         })
       },
       ask: (prompt) => askMuse(key, prompt),
