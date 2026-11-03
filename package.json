@@ -15,6 +15,7 @@
     "check": "tsx scripts/check-workspace.ts",
     "eval:transcribe": "tsx eval/transcribe.ts",
     "eval:compare": "tsx eval/compare.ts",
+    "eval:formalize": "tsx eval/formalize.ts",
     "seed:sample": "tsx scripts/seed-sample.ts"
   },
   "dependencies": {
