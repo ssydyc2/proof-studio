@@ -105,23 +105,26 @@ svg {
   gap: 10px;
   padding: 0 8px 14px;
   font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.015em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .logo {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   background: linear-gradient(160deg, #3d8bff, var(--blue) 60%, #0050d4);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
     0 2px 6px rgba(8, 102, 255, 0.3);
   color: #fff;
-  font-size: 16px;
-  line-height: 1;
+}
+
+.logo svg {
+  width: 20px;
+  height: 20px;
 }
 
 .new-problem {

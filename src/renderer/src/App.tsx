@@ -245,8 +245,8 @@ export function App() {
       <aside className="sidebar">
         <div className="drag" />
         <div className="brand">
-          <span className="logo">∎</span>
-          Proof Studio
+          <Logo />
+          ProofStudio
         </div>
         <button className="new-problem" type="button" onClick={() => void openFolder()}>
           <Icon name="plus" />
@@ -320,7 +320,7 @@ export function App() {
               {selected && <Icon name="folder" size={13} />}
               {selected?.title ?? 'No problem selected'}
             </div>
-            <h1>{pair?.title ?? 'Proof Studio'}</h1>
+            <h1>{pair?.title ?? 'ProofStudio'}</h1>
             {pair && (
               <div className="filename">
                 <span className="chip">{fileName(selected, pair.left)}</span>
@@ -417,7 +417,7 @@ export function App() {
         <div className="modal-backdrop">
           <form className="modal" onSubmit={(event) => void saveKey(event)}>
             <h2>API key</h2>
-            <p>Enter your Meta Model API key. It stays in memory until you quit Proof Studio.</p>
+            <p>Enter your Meta Model API key. It stays in memory until you quit ProofStudio.</p>
             <input
               autoFocus
               type="password"
@@ -514,6 +514,18 @@ const ICONS = {
   arrow: 'M3 8h10M9 4l4 4-4 4',
   alert: 'M8 2.5 14 13H2zM8 6.5v3M8 11.5v.01'
 } as const
+
+function Logo() {
+  return (
+    <span className="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <rect x="3.5" y="4" width="2.6" height="16" rx="1.3" fill="currentColor" />
+        <rect x="3.5" y="10.7" width="10.2" height="2.6" rx="1.3" fill="currentColor" />
+        <rect x="15.4" y="8.2" width="5.4" height="5.4" rx="0.8" fill="currentColor" />
+      </svg>
+    </span>
+  )
+}
 
 function Icon({ name, size = 16 }: { name: keyof typeof ICONS; size?: number }) {
   return (
