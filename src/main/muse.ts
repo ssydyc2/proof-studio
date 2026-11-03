@@ -5,7 +5,7 @@ import { compileLeanSource, installLeanProject, prepareLean, removeLeanProject }
 import { proveSource } from './prove'
 import { FORMALIZE_ATTEMPTS, type FormalizeProgress } from '../shared/formalize'
 import { proofAttemptCount, type ProveProgress } from '../shared/prove'
-import { ensureLatexDocument, LEAN_DIR, type ProblemSummary } from '../shared/problem'
+import { ensureLatexDocument, PROBLEM_ENV, SOLUTION_ENV, type ProblemSummary } from '../shared/problem'
 import {
   problemDirectory,
   readFile,
@@ -107,7 +107,7 @@ export async function formalizeProblem(
     })
     const summary = writeLeanStub(id, source)
     const dir = problemDirectory(id)
-    await installLeanProject(path.join(dir, LEAN_DIR))
+    await installLeanProject(path.join(dir, PROBLEM_ENV))
     removeLeanProject(dir)
     return summary
   } catch (error) {
@@ -149,7 +149,9 @@ export async function proveProblem(
       ask: (prompt) => askMuse(key, prompt),
       compile: compileLeanSource
     })
-    return writeLeanProof(id, source)
+    const summary = writeLeanProof(id, source)
+    await installLeanProject(path.join(problemDirectory(id), SOLUTION_ENV))
+    return summary
   } catch (error) {
     failStep(id, 'leanProof', explainMuseError(error, key))
   }

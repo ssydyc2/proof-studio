@@ -214,8 +214,6 @@ export function App() {
     setBusy('formalize')
     setFormalizeProgress(null)
     setFormalizeRounds([])
-    setProveProgress(null)
-    setProveRounds([])
     setError(null)
     try {
       if (draft !== loaded.current) {
@@ -247,8 +245,6 @@ export function App() {
     setBusy('prove')
     setProveProgress(null)
     setProveRounds([])
-    setFormalizeProgress(null)
-    setFormalizeRounds([])
     setError(null)
     try {
       const nextProblems = await window.proofStudio.prove(id, count)
@@ -512,7 +508,7 @@ export function App() {
             </button>
           )}
         </header>
-        {(formalizeProgress || formalizeRounds.length > 0) && (
+        {pair?.action === 'generate-lean' && (formalizeProgress || formalizeRounds.length > 0) && (
           <StatusLog
             waiting={
               formalizeProgress?.phase === 'setup'
@@ -529,7 +525,7 @@ export function App() {
             }))}
           />
         )}
-        {(proveProgress || proveRounds.length > 0) && (
+        {pair?.action === 'generate-proof' && (proveProgress || proveRounds.length > 0) && (
           <StatusLog
             waiting={
               proveProgress?.phase === 'setup'
@@ -898,9 +894,9 @@ function emptyCopy(key: FileKey): string {
     case 'problemPdf':
       return 'problem.pdf is created when you generate a PDF from problem.tex.'
     case 'leanStub':
-      return 'stub.lean is created from problem.tex and saved in the lean folder. Muse writes two Lean statements of the problem. Each proof is sorry, and Lake checks the file against Mathlib.'
+      return 'stub.lean is created from problem.tex and saved in the problem folder, with its own Lean project. Muse writes two Lean statements of the problem. Each proof is sorry, and Lake checks the file against Mathlib.'
     case 'leanProof':
-      return 'proof.lean is written into the lean folder. Muse proves one statement from stub.lean. Set how many attempts each statement gets. If the first compiles, the second is left alone.'
+      return 'proof.lean is written into the solution folder, separate from the problem project. Muse proves one statement from stub.lean. Set how many attempts each statement gets. If the first compiles, the second is left alone.'
     case 'readable':
       return 'Generate readable proof is not available in this version.'
     case 'readablePdf':
