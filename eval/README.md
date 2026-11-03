@@ -26,7 +26,7 @@ npm run eval:compare -- 01-putnam-2020-b5
 
 ## Formalize
 
-`npm run eval:formalize` writes two Lean statements with the app's formalize path. Each problem gets `lean/<folder>/stub.lean`. GLM checks a file that contains two statements against `source.png`. The outcome is `results/formalize.json`. A single compiled statement is still a usable formalization, because a second wording is not always available.
+`npm run eval:formalize` writes two Lean statements with the app's formalize path. Each problem gets `lean/<folder>/stub.lean`. GLM checks a file that contains two statements against `source.png`. The outcome is `results/formalize.json`. A single compiled statement is still a usable formalization. The two attempts are shared, so both can be spent producing the first statement, and a second wording is not always available.
 
 ```
 npm run eval:formalize -- 01-putnam-2020-b5
@@ -44,7 +44,7 @@ GLM 5.3 Flash judged 49 of 50 as the same problem. It marked 31 (Herstein 2.2.5)
 
 ### Formalize
 
-45 of 50 produced a compiled statement. The 10 that stopped at one statement are counted here: 02, 10, 22, 24, 28, 29, 32, 34, 46, 50. A second wording is not always available.
+45 of 50 produced a compiled statement. The 10 that stopped at one statement are counted here: 02, 10, 22, 24, 28, 29, 32, 34, 46, 50. The two attempts are shared, so a failed first try spends the second attempt on that same statement. A second wording is also not always available.
 
 4 did not compile: 05, 17, 25, 44.
 
