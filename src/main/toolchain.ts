@@ -52,6 +52,38 @@ export function pdflatexCommand(): string {
   return found
 }
 
+export function installedLeanRelease(
+  root = path.join(os.homedir(), '.elan', 'toolchains')
+): { toolchain: string; version: string } | null {
+  let names: string[] = []
+  try {
+    names = fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
+  } catch {
+    names = []
+  }
+  const found = names
+    .map(decodeToolchain)
+    .filter((item): item is { toolchain: string; version: string } => item != null)
+    .sort((a, b) => compareVersion(b.version, a.version))
+  return found[0] ?? null
+}
+
+function decodeToolchain(dirName: string): { toolchain: string; version: string } | null {
+  const toolchain = dirName.replace('---', ':').replace('--', '/')
+  const match = toolchain.match(/:v(\d+\.\d+\.\d+)$/)
+  if (!match) return null
+  return { toolchain, version: match[1] }
+}
+
+function compareVersion(left: string, right: string): number {
+  const a = left.split('.').map(Number)
+  const b = right.split('.').map(Number)
+  for (let index = 0; index < 3; index++) {
+    if (a[index] !== b[index]) return a[index] - b[index]
+  }
+  return 0
+}
+
 export async function toolchainStatus(): Promise<ToolStatus[]> {
   return Promise.all(
     (Object.keys(TOOLS) as ToolId[]).map(async (id) => {
@@ -60,8 +92,12 @@ export async function toolchainStatus(): Promise<ToolStatus[]> {
       if (!bin) {
         return { id, label: tool.label, ready: false, detail: 'Not found', hint: tool.hint }
       }
+      const leanRelease = id === 'lean' ? installedLeanRelease() : null
+      if (id === 'lean' && bin.includes(`${path.sep}.elan${path.sep}`) && !leanRelease) {
+        return { id, label: tool.label, ready: false, detail: 'Not found', hint: tool.hint }
+      }
       try {
-        const detail = await versionOf(bin)
+        const detail = await versionOf(bin, leanRelease?.toolchain)
         return { id, label: tool.label, ready: true, detail, hint: tool.hint }
       } catch {
         return { id, label: tool.label, ready: false, detail: 'Not found', hint: tool.hint }
@@ -70,11 +106,12 @@ export async function toolchainStatus(): Promise<ToolStatus[]> {
   )
 }
 
-function versionOf(bin: string): Promise<string> {
+function versionOf(bin: string, toolchain?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, ['--version'], {
       env: {
         ...process.env,
+        ...(toolchain ? { ELAN_TOOLCHAIN: toolchain } : {}),
         PATH: `${path.dirname(bin)}${path.delimiter}${process.env.PATH ?? ''}`
       }
     })
