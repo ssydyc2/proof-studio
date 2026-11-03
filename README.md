@@ -26,15 +26,26 @@ npm run dev
 
 `npm run dev` installs nothing extra and opens the Electron app against the local dev server.
 
-## Build the app
+## Generate the app
 
 ```bash
 npm install
-npm run build
-npx electron .
+npm run app
+open dist/mac-arm64/ProofStudio.app
 ```
 
-`npm run build` writes the production bundle to `out/`. `npx electron .` opens that bundle. This does not produce a `.dmg`.
+`npm run app` writes `dist/mac-arm64/ProofStudio.app`. The Dock and the menu name are ProofStudio.
+
+`out/` is the compiled JavaScript, not the app. `npm run dev` and `npx electron .` launch Electron's own shell, so macOS calls that window Electron.
+
+## Generate a DMG
+
+```bash
+npm run dmg
+open dist/ProofStudio-0.1.0-arm64.dmg
+```
+
+`npm run dmg` writes `dist/ProofStudio-0.1.0-arm64.dmg`. The version in the file name comes from `package.json`. Opening the disk image shows `ProofStudio.app`, which you can drag into Applications.
 
 ## Changes
 
