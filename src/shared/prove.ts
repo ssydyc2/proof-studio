@@ -1,6 +1,7 @@
 export const PROOF_ATTEMPTS = 3
 export const PROOF_ATTEMPT_MAX = 10
 export const PROOF_STATEMENTS = 2
+export const PROOF_REQUEST_MS = 15 * 60 * 1000
 
 export function proofAttemptCount(value: unknown): number {
   const count = typeof value === 'number' ? value : Number(value)

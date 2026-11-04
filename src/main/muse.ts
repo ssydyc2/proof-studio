@@ -1,5 +1,6 @@
 import path from 'node:path'
 import OpenAI from 'openai'
+import { Agent, fetch as undiciFetch } from 'undici'
 import { explainSource } from './explain'
 import { formalizeSource } from './formalize'
 import { compileTex } from './latex'
@@ -8,7 +9,7 @@ import { proveSource } from './prove'
 import { EXPLAIN_ATTEMPTS, type ExplainProgress } from '../shared/explain'
 import { leanLines, parseLeanRanges, type LeanRange } from '../shared/locate'
 import { FORMALIZE_ATTEMPTS, type FormalizeProgress } from '../shared/formalize'
-import { proofAttemptCount, type ProveProgress } from '../shared/prove'
+import { PROOF_REQUEST_MS, proofAttemptCount, type ProveProgress } from '../shared/prove'
 import { ensureLatexDocument, PROBLEM_ENV, SOLUTION_ENV, type ProblemSummary } from '../shared/problem'
 import {
   problemDirectory,
@@ -141,6 +142,46 @@ export async function formalizeProblem(
   }
 }
 
+export async function proveStub(
+  key: string,
+  stub: string,
+  attempts: number,
+  onProgress?: (progress: ProveProgress) => void
+): Promise<string> {
+  const trimmed = key.trim()
+  if (!trimmed) throw new Error('Enter an API key.')
+  if (!stub.trim()) throw new Error('No Lean stub yet.')
+  const count = proofAttemptCount(attempts)
+  const rounds: ProveProgress['rounds'] = []
+  let running: ProveProgress['running'] = []
+  const publish = (progress: ProveProgress) => onProgress?.(progress)
+  publish({ phase: 'setup', statement: 1, attempt: 0, total: count, rounds, running })
+  const project = await prepareLean()
+  return proveSource({
+    stub,
+    toolchain: project.toolchain,
+    attempts: count,
+    onRunning: (next) => {
+      running = next
+    },
+    onAttempt: (statement, attempt) =>
+      publish({ phase: 'attempt', statement, attempt, total: count, rounds: [...rounds], running: [...(running ?? [])] }),
+    onRound: (round) => {
+      rounds.push(round)
+      publish({
+        phase: 'round',
+        statement: round.statement,
+        attempt: round.attempt,
+        total: count,
+        rounds: [...rounds],
+        running: [...(running ?? [])]
+      })
+    },
+    ask: (prompt) => askMuse(trimmed, prompt, 'xhigh', PROOF_REQUEST_MS, 0),
+    compile: compileLeanSource
+  })
+}
+
 export async function proveProblem(
   id: string,
   attempts: number,
@@ -149,37 +190,9 @@ export async function proveProblem(
   if (!hasApiKey() || !apiKey) throw new Error('Enter an API key first.')
   const stub = readFile(id, 'leanStub')
   if (stub.kind !== 'text' || !stub.text.trim()) throw new Error('No Lean stub yet.')
-  const count = proofAttemptCount(attempts)
   const key = apiKey
   try {
-    const rounds: ProveProgress['rounds'] = []
-    let running: ProveProgress['running'] = []
-    const publish = (progress: ProveProgress) => onProgress?.(progress)
-    publish({ phase: 'setup', statement: 1, attempt: 0, total: count, rounds, running })
-    const project = await prepareLean()
-    const source = await proveSource({
-      stub: stub.text,
-      toolchain: project.toolchain,
-      attempts: count,
-      onRunning: (next) => {
-        running = next
-      },
-      onAttempt: (statement, attempt) =>
-        publish({ phase: 'attempt', statement, attempt, total: count, rounds: [...rounds], running: [...(running ?? [])] }),
-      onRound: (round) => {
-        rounds.push(round)
-        publish({
-          phase: 'round',
-          statement: round.statement,
-          attempt: round.attempt,
-          total: count,
-          rounds: [...rounds],
-          running: [...(running ?? [])]
-        })
-      },
-      ask: (prompt) => askMuse(key, prompt),
-      compile: compileLeanSource
-    })
+    const source = await proveStub(key, stub.text, attempts, onProgress)
     const summary = writeLeanProof(id, source)
     await installLeanProject(path.join(problemDirectory(id), SOLUTION_ENV))
     return summary
@@ -276,24 +289,38 @@ async function askMuse(
   key: string,
   prompt: string,
   effort: 'low' | 'medium' | 'high' | 'xhigh' = 'xhigh',
-  timeout = 300_000
+  timeout = 300_000,
+  maxRetries = 2
 ): Promise<string> {
-  const client = new OpenAI({
-    apiKey: key,
-    baseURL: BASE_URL,
-    timeout
-  })
-  const response = await client.responses.create({
-    model: MODEL,
-    reasoning: { effort },
-    input: [
-      {
-        role: 'user',
-        content: [{ type: 'input_text', text: prompt }]
-      }
-    ]
-  })
-  return response.output_text ?? ''
+  const dispatcher = new Agent({ headersTimeout: timeout, bodyTimeout: timeout })
+  try {
+    const client = new OpenAI({
+      apiKey: key,
+      baseURL: BASE_URL,
+      timeout,
+      maxRetries,
+      fetch: undiciFetch as unknown as typeof fetch,
+      fetchOptions: { dispatcher }
+    })
+    const stream = await client.responses.create({
+      model: MODEL,
+      reasoning: { effort },
+      stream: true,
+      input: [
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: prompt }]
+        }
+      ]
+    })
+    const parts: string[] = []
+    for await (const event of stream) {
+      if (event.type === 'response.output_text.done') parts.push(event.text)
+    }
+    return parts.join('')
+  } finally {
+    await dispatcher.close()
+  }
 }
 
 function stripFence(text: string): string {
