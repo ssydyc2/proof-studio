@@ -201,6 +201,31 @@ export async function proveProblem(
   }
 }
 
+export async function explainProof(
+  key: string,
+  lean: string,
+  problem: string,
+  compile: (tex: string) => Promise<{ ok: true } | { ok: false; message: string }>,
+  onProgress?: (progress: ExplainProgress) => void
+): Promise<string> {
+  const trimmed = key.trim()
+  if (!trimmed) throw new Error('Enter an API key.')
+  if (!lean.trim()) throw new Error('No Lean proof yet.')
+  const rounds: ExplainProgress['rounds'] = []
+  const publish = (progress: ExplainProgress) => onProgress?.(progress)
+  return explainSource({
+    lean,
+    problem,
+    onAttempt: (attempt) => publish({ phase: 'attempt', attempt, total: EXPLAIN_ATTEMPTS, rounds: [...rounds] }),
+    onRound: (round) => {
+      rounds.push(round)
+      publish({ phase: 'round', attempt: round.attempt, total: EXPLAIN_ATTEMPTS, rounds: [...rounds] })
+    },
+    ask: (prompt) => askMuse(trimmed, prompt),
+    compile
+  })
+}
+
 export async function explainProblem(
   id: string,
   onProgress?: (progress: ExplainProgress) => void
@@ -211,19 +236,12 @@ export async function explainProblem(
   const problem = readFile(id, 'problemText')
   const key = apiKey
   try {
-    const rounds: ExplainProgress['rounds'] = []
-    const publish = (progress: ExplainProgress) => onProgress?.(progress)
     let summary: ProblemSummary | null = null
-    await explainSource({
-      lean: proof.text,
-      problem: problem.kind === 'text' ? problem.text : '',
-      onAttempt: (attempt) => publish({ phase: 'attempt', attempt, total: EXPLAIN_ATTEMPTS, rounds: [...rounds] }),
-      onRound: (round) => {
-        rounds.push(round)
-        publish({ phase: 'round', attempt: round.attempt, total: EXPLAIN_ATTEMPTS, rounds: [...rounds] })
-      },
-      ask: (prompt) => askMuse(key, prompt),
-      compile: async (tex) => {
+    await explainProof(
+      key,
+      proof.text,
+      problem.kind === 'text' ? problem.text : '',
+      async (tex) => {
         summary = writeSolutionText(id, tex)
         try {
           await compileTex(id, 'solutionTex')
@@ -232,8 +250,9 @@ export async function explainProblem(
           const message = error instanceof Error ? error.message : 'pdflatex failed.'
           return { ok: false, message }
         }
-      }
-    })
+      },
+      onProgress
+    )
     if (!summary) throw new Error('The solution TeX was empty.')
     return summary
   } catch (error) {
