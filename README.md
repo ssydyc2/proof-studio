@@ -1,6 +1,6 @@
 # ProofStudio
 
-ProofStudio is a macOS app for working on a math proof, one step at a time.
+ProofStudio is a macOS app for working on a math proof e2e.
 
 ![ProofStudio with a Lean proof beside the generated solution PDF](docs/demo.jpg)
 
@@ -8,12 +8,13 @@ You open a folder. The folder name is the problem name. The app keeps the files 
 
 The steps are:
 
-1. Add a screenshot and turn it into `problem.tex`.
-2. Turn that statement into a Lean problem whose proof is `sorry`.
-3. Generate the Lean proof.
-4. Write `solution.tex` and compare `solution.pdf` with the Lean proof.
+1. Add a screenshot and turn it into `problem.tex`. The app compiles it with `pdflatex`. A TeX error stops this step. `problem.pdf` is not listed.
 
-Steps 1, 2, 3, and 4 are available. Step 2 turns `problem.tex` into `problem/stub.lean`. That folder is its own Lake project (`lean-toolchain`, `lakefile.toml`, `lake-manifest.json`). Step 3 writes `solution/proof.lean` in a separate Lake project. The two projects link their Mathlib packages to one shared build. The app lists `problem/stub.lean` and `solution/proof.lean` only. Muse writes two Lean statements, each proved by `sorry`. If the first does not compile, the next question asks for it again. If it compiles, the next question appends a second statement and does not add an iff theorem. Each file is checked with `lake env lean`, because a bare `lean` command cannot see Mathlib. A statement that already compiled is kept. Muse is asked to prove each statement on its own. The two statements run at the same time, and the first proof that compiles is kept. The attempt count is the number next to Generate Lean proof, from 1 to 10, and it starts at 3. A reply that still contains `sorry` is rejected. If it compiles, the second statement is not sent. If every attempt fails and a second statement exists, that statement gets the same number of attempts. The Lean errors from every earlier attempt on that statement stay on that step’s page and are sent with the next attempt. Switching to another file hides them, and switching back shows them again. Generating the TeX problem also compiles it with the `pdflatex` on this Mac, so a TeX error stops that step. `problem.pdf` is not listed. Step 4 asks Muse for a LaTeX proof that follows `solution/proof.lean`, writes `solution.tex`, and compiles `solution.pdf`. A document that does not compile is sent back with the pdflatex error, up to 3 attempts. `solution.pdf` opens beside the Lean proof. Select a passage in that PDF and right-click Lean component. Muse names the lines of `solution/proof.lean` that passage comes from, and those lines are highlighted.
+2. Turn that statement into `problem/stub.lean`, a Lake project whose proof is `sorry`. Muse writes two statements. A statement that does not compile is asked again. One that compiles is kept, and the next question adds a second statement. Each file is checked with `lake env lean`.
+
+3. Generate `solution/proof.lean` in a separate Lake project. Both projects share one Mathlib build, and the app lists only the two Lean files. The statements are proved at the same time, and the first proof that compiles is kept. Attempts start at 3 and can be set from 1 to 10. A reply that still contains `sorry` is rejected. Earlier Lean errors stay on this step and go with the next attempt.
+
+4. Write `solution.tex` from the Lean proof and compile `solution.pdf`, up to 3 attempts. The PDF opens beside the proof. Select a passage and right-click Lean component to highlight the matching lines.
 
 A Meta Muse API key is entered in the app and kept in memory until you quit. It is not saved to disk.
 
