@@ -6,7 +6,7 @@ Everything for evaluation lives in this folder.
 - `meta_key` is the Meta API key used for transcription. `glm_key` is the GLM API key used for comparison. Neither is committed.
 - One script per step, run from the repo root. A folder name limits the run to one problem.
 - Screenshot transcription stays in the app, because generating TeX uses it. `glm.ts` calls GLM for the comparison only.
-- `results/` holds each step's output and is not committed. Generated `problem.tex` and `problem.pdf` stay in the problem folder and are not committed. Generated Lean files go in `lean/` and are not committed.
+- `results/` holds each step's output and is not committed. Generated `problem.tex` and `problem.pdf` stay in the problem folder and are not committed. Generated Lean statements go in `lean/` and generated proofs go in `proofs/`. Neither is committed.
 
 ## Transcribe
 
@@ -32,6 +32,14 @@ npm run eval:compare -- 01-putnam-2020-b5
 npm run eval:formalize -- 01-putnam-2020-b5
 ```
 
+## Prove
+
+`npm run eval:prove` proves the 45 problems that formalized. It skips 05, 08, 17, 25, and 44. Each statement gets 4 attempts, using the app's prove path, and five problems run at once. Each Muse request may run for 15 minutes. A timeout fails that problem. A reply that does not compile uses another attempt. A proof is written to `proofs/<folder>/proof.lean` when Lean accepts it. The outcome is `results/prove.json`.
+
+```
+npm run eval:prove -- 13-ireland-rosen-3-4
+```
+
 ## Results
 
 ### Transcribe
@@ -49,3 +57,11 @@ GLM 5.3 Flash judged 49 of 50 as the same problem. It marked 31 (Herstein 2.2.5)
 4 did not compile: 05, 17, 25, 44.
 
 08 compiled two statements. GLM marked the second one different because it requires the expression under the square root to be positive. That call is debatable.
+
+### Prove
+
+Stopped early. 27 of 45 produced a compiled proof. The run skips 05, 08, 17, 25, and 44. Each Muse request may run for 15 minutes. A timeout fails that problem.
+
+3 used all 4 attempts and Lean still rejected the proof: 22, 24, 26. 22 failed because a Mathlib object file was missing.
+
+15 were timed out: 02, 04, 06, 27, 28, 30, 33, 34, 36, 37, 41, 47, 48, 49, 50. `npm run eval:prove` resumes from `results/prove.json` and skips finished problems.

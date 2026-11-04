@@ -16,6 +16,7 @@
     "eval:transcribe": "tsx eval/transcribe.ts",
     "eval:compare": "tsx eval/compare.ts",
     "eval:formalize": "tsx eval/formalize.ts",
+    "eval:prove": "tsx eval/prove.ts",
     "seed:sample": "tsx scripts/seed-sample.ts"
   },
   "dependencies": {
