@@ -6,7 +6,8 @@ Everything for evaluation lives in this folder.
 - `meta_key` is the Meta API key used for transcription. `glm_key` is the GLM API key used for comparison. Neither is committed.
 - One script per step, run from the repo root. A folder name limits the run to one problem.
 - Screenshot transcription stays in the app, because generating TeX uses it. `glm.ts` calls GLM for the comparison only.
-- `results/` holds each step's output and is not committed. Generated `problem.tex` and `problem.pdf` stay in the problem folder and are not committed. Generated Lean statements go in `lean/` and generated proofs go in `proofs/`. Neither is committed.
+- `results/` holds each step's output and is not committed. Generated `problem.tex` and `problem.pdf` stay in the problem folder and are not committed. Generated Lean statements go in `lean/`, proofs go in `proofs/`, and solution PDFs go in `solutions/`. None of these are committed.
+- `output/` is the final set kept for review. Each problem folder has `proof.lean` and `solution.pdf`.
 
 ## Transcribe
 
@@ -40,6 +41,14 @@ npm run eval:formalize -- 01-putnam-2020-b5
 npm run eval:prove -- 13-ireland-rosen-3-4
 ```
 
+## Explain
+
+`npm run eval:explain` turns each compiled proof into `solutions/<folder>/solution.tex` and `solution.pdf`, using the app's explain path. It runs only the problems whose proof compiled. The outcome is `results/explain.json`.
+
+```
+npm run eval:explain -- 13-ireland-rosen-3-4
+```
+
 ## Results
 
 ### Transcribe
@@ -65,3 +74,7 @@ Stopped early. 27 of 45 produced a compiled proof. The run skips 05, 08, 17, 25,
 3 used all 4 attempts and Lean still rejected the proof: 22, 24, 26. 22 failed because a Mathlib object file was missing.
 
 15 were timed out: 02, 04, 06, 27, 28, 30, 33, 34, 36, 37, 41, 47, 48, 49, 50. `npm run eval:prove` resumes from `results/prove.json` and skips finished problems.
+
+### Explain
+
+All 27 compiled proofs produced `solution.pdf`. Those proofs and PDFs are in `output/<folder>/`.
