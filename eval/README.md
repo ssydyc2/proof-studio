@@ -64,4 +64,4 @@ Stopped early. 27 of 45 produced a compiled proof. The run skips 05, 08, 17, 25,
 
 3 used all 4 attempts and Lean still rejected the proof: 22, 24, 26. 22 failed because a Mathlib object file was missing.
 
-15 were still running when the run stopped: 02, 04, 06, 27, 28, 30, 33, 34, 36, 37, 41, 47, 48, 49, 50. `npm run eval:prove` resumes from `results/prove.json` and skips finished problems.
+15 were timed out: 02, 04, 06, 27, 28, 30, 33, 34, 36, 37, 41, 47, 48, 49, 50. `npm run eval:prove` resumes from `results/prove.json` and skips finished problems.
