@@ -8,7 +8,7 @@ You open a folder. The folder name is the problem name. The app keeps the files 
 
 The steps are:
 
-1. Add a screenshot and turn it into `problem.tex`. The app compiles it with `pdflatex`. A TeX error stops this step. `problem.pdf` is not listed.
+1. Add a screenshot and turn it into `problem.tex`. The app compiles it with `pdflatex`. A TeX error stops this step.
 
 2. Turn that statement into `problem/stub.lean`, a Lake project whose proof is `sorry`. Muse writes two statements. A statement that does not compile is asked again. One that compiles is kept, and the next question adds a second statement. Each file is checked with `lake env lean`.
 
