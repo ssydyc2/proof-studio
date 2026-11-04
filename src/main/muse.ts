@@ -289,7 +289,7 @@ async function askMuse(
   key: string,
   prompt: string,
   effort: 'low' | 'medium' | 'high' | 'xhigh' = 'xhigh',
-  timeout = 300_000,
+  timeout = 15 * 60 * 1000,
   maxRetries = 2
 ): Promise<string> {
   const dispatcher = new Agent({ headersTimeout: timeout, bodyTimeout: timeout })
